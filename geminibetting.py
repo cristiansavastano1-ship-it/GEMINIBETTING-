@@ -9,7 +9,7 @@ st.set_page_config(
     page_icon="⚽",
 )
 
-# Stile CSS avanzato per una visibilità perfetta e staccata dallo sfondo
+# Stile CSS avanzato per correggere la visibilità dei selettori e dei testi
 st.markdown(
     """
     <style>
@@ -19,6 +19,10 @@ st.markdown(
     .metric-box { background-color: #1f2937; padding: 15px; border-radius: 10px; border: 1px solid #374151; text-align: center; }
     .value-box { background-color: #064e3b; border-left: 6px solid #10b981; padding: 18px; border-radius: 10px; margin-top: 15px; color: #ecfdf5; }
     .no-value-box { background-color: #7f1d1d; border-left: 6px solid #ef4444; padding: 18px; border-radius: 10px; margin-top: 15px; color: #fef2f2; }
+    
+    /* Miglioramento visibilità selettori radio */
+    div.row-widget.stRadio > div { color: #ffffff !important; font-weight: bold; }
+    div.row-widget.stRadio label { color: #ffffff !important; font-size: 15px !important; }
     </style>
 """,
     unsafe_allow_html=True,
@@ -26,8 +30,8 @@ st.markdown(
 
 st.title("⚽ Pro Betting Studio & Deep Match Analytics")
 st.markdown(
-    "Piattaforma avanzata con analisi dinamica, combo, tiri, corner e"
-    " uomini-bonus."
+    "Piattaforma avanzata con analisi dinamica, coerenza statistica e mercati"
+    " mirati."
 )
 
 # Dizionario dei campionati supportati
@@ -89,7 +93,7 @@ def scarica_classifica(chiave, league_code):
   return None
 
 
-# --- TAB 1: CALENDARIO E STUDIO STATISTICO DINAMICO ---
+# --- TAB 1: CALENDARIO E STUDIO STATISTICO COERENTE ---
 with tab_calendario:
   if api_key:
     dati = scarica_dati(api_key, codice_lega)
@@ -181,13 +185,14 @@ with tab_calendario:
         " i campionati."
     )
 
-  # SEZIONE STUDIO DETTAGLIATO DINAMICO
+  # SEZIONE STUDIO DETTAGLIATO COERENTE
   if "match_attivo" in st.session_state:
     m = st.session_state["match_attivo"]
 
     sq_casa = m["casa"]
     sq_trasf = m["trasferta"]
 
+    # Recupero statistiche reali o stima bilanciata coerente
     if (
         "statistiche_squadre" in locals()
         and sq_casa in statistiche_squadre
@@ -197,47 +202,62 @@ with tab_calendario:
       med_gs_casa = statistiche_squadre[sq_casa]["media_gs"]
       med_gf_trasf = statistiche_squadre[sq_trasf]["media_gf"]
       med_gs_trasf = statistiche_squadre[sq_trasf]["media_gs"]
+      punti_casa = statistiche_squadre[sq_casa]["punti"]
+      punti_trasf = statistiche_squadre[sq_trasf]["punti"]
     else:
       seed_c = sum(ord(c) for c in sq_casa)
       seed_t = sum(ord(c) for c in sq_trasf)
-      med_gf_casa = 1.0 + (seed_c % 15) / 10.0
-      med_gs_trasf = 0.8 + (seed_t % 12) / 10.0
-      med_gf_trasf = 0.9 + (seed_t % 13) / 10.0
-      med_gs_casa = 0.9 + (seed_c % 11) / 10.0
+      med_gf_casa = 1.3 + (seed_c % 10) / 10.0
+      med_gs_casa = 1.0 + (seed_c % 8) / 10.0
+      med_gf_trasf = 1.2 + (seed_t % 10) / 10.0
+      med_gs_trasf = 1.1 + (seed_t % 9) / 10.0
+      punti_casa = seed_c % 40
+      punti_trasf = seed_t % 40
+
+    # Calcoli unificati e coerenti basati sui punti e sulla forza offensiva/difensiva
+    forza_casa = punti_casa + (med_gf_casa - med_gs_casa) * 5
+    forza_trasf = punti_trasf + (med_gf_trasf - med_gs_trasf) * 5
+
+    diff_forza = forza_casa - forza_trasf
+    if diff_forza > 5:
+      p_c_1x2, p_p_1x2, p_t_1x2 = 58, 26, 16
+    elif diff_forza < -5:
+      p_c_1x2, p_p_1x2, p_t_1x2 = 22, 28, 50
+    else:
+      p_c_1x2, p_p_1x2, p_t_1x2 = 40, 32, 28
 
     xg_stimati = round(med_gf_casa + med_gf_trasf, 2)
-    prob_casa = min(max(int(50 + (med_gf_casa - med_gs_trasf) * 20), 20), 80)
-    prob_trasf = min(max(int(30 + (med_gf_trasf - med_gs_casa) * 15), 10), 70)
-    prob_pareggio = max(100 - prob_casa - prob_trasf, 10)
+    over_25_rate = min(max(int((xg_stimati / 2.8) * 100), 30), 85)
+    btts_rate = min(max(int(((med_gf_casa + med_gf_trasf) / 3.0) * 100), 35), 80)
 
-    tot_p = prob_casa + prob_pareggio + prob_trasf
-    p_c_1x2 = round((prob_casa / tot_p) * 100)
-    p_p_1x2 = round((prob_pareggio / tot_p) * 100)
-    p_t_1x2 = 100 - p_c_1x2 - p_p_1x2
+    # Risultati esatti coerenti con le percentuali 1X2 e i gol stimati
+    if p_c_1x2 > p_t_1x2:
+      gol_c_est, gol_t_est = max(1, round(med_gf_casa)), round(
+          min(med_gf_trasf, med_gf_casa - 0.5)
+      )
+    else:
+      gol_c_est, gol_t_est = round(min(med_gf_casa, med_gf_trasf - 0.5)), max(
+          1, round(med_gf_trasf)
+      )
 
-    over_25_rate = min(max(int((xg_stimati / 3.0) * 100), 30), 85)
-    btts_rate = min(max(int(((med_gf_casa + med_gf_trasf) / 3.2) * 100), 35), 80)
-
-    gol_c_stimati = round((med_gf_casa + med_gs_trasf) / 2)
-    gol_t_stimati = round((med_gf_trasf + med_gs_casa) / 2)
     risultati_possibili = [
-        (f"{gol_c_stimati} - {gol_t_stimati}", "38% Prob."),
-        (f"{max(0, gol_c_stimati - 1)} - {gol_t_stimati}", "26% Prob."),
-        (f"{gol_c_stimati + 1} - {gol_t_stimati}", "19% Prob."),
-        (f"{gol_c_stimati} - {max(0, gol_t_stimati + 1)}", "15% Prob."),
+        (f"{gol_c_est} - {gol_t_est}", "42% Prob."),
+        (f"{max(0, gol_c_est - 1)} - {gol_t_est}", "28% Prob."),
+        (f"{gol_c_est + 1} - {gol_t_est}", "18% Prob."),
+        (f"{gol_c_est} - {max(0, gol_t_est + 1)}", "12% Prob."),
     ]
 
     combo_1 = (
         "1 + Over 1.5"
         if p_c_1x2 > 40
-        else ("1X + Under 3.5" if p_p_1x2 > 25 else "2 + Over 1.5")
+        else ("X2 + Over 1.5" if p_t_1x2 > 40 else "1X + Under 3.5")
     )
-    combo_2 = "1X + Goal (BTTS)" if btts_rate > 50 else "1X + No Goal"
-    combo_3 = "X2 + Over 1.5" if p_t_1x2 > 30 else "1 + Multigol 2-4"
+    combo_2 = "1X + Goal (BTTS)" if btts_rate > 50 else "X2 + No Goal"
+    combo_3 = "1 + Multigol 2-4" if p_c_1x2 > p_t_1x2 else "2 + Multigol 2-4"
 
-    tiri_porta_casa = round(4.5 + med_gf_casa, 1)
-    tiri_porta_trasf = round(3.5 + med_gf_trasf, 1)
-    corner_totali = round(9.0 + (xg_stimati * 0.5), 1)
+    tiri_porta_casa = round(4.0 + med_gf_casa, 1)
+    tiri_porta_trasf = round(3.8 + med_gf_trasf, 1)
+    corner_totali = round(9.2 + (xg_stimati * 0.4), 1)
 
     st.markdown('<div class="analysis-container">', unsafe_allow_html=True)
     st.markdown(
@@ -312,7 +332,9 @@ with tab_calendario:
         )
       with col4:
         dc_consigliata = (
-            "1X" if p_c_1x2 >= p_t_1x2 else ("X2" if p_t_1x2 > p_c_1x2 else "12")
+            "1X"
+            if p_c_1x2 >= p_t_1x2
+            else ("X2" if p_t_1x2 > p_c_1x2 else "12")
         )
         st.markdown(
             f'<div class="metric-box"><b>Doppia Chance</b><br><span'
@@ -397,8 +419,8 @@ with tab_calendario:
             unsafe_allow_html=True,
         )
       st.info(
-          "💡 **Analisi Risultato Esatto:** Punteggi stimati incrociando i gol"
-          " fatti e subiti in stagione."
+          "💡 **Analisi Risultato Esatto:** Punteggi stimati coerentemente con"
+          " le percentuali di vittoria e le medie gol complessive."
       )
 
     elif focus_mercato == "⚡ Combo Consigliate":

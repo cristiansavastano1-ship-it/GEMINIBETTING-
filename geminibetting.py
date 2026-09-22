@@ -9,7 +9,7 @@ st.set_page_config(
     page_icon="⚽",
 )
 
-# Stile CSS avanzato per correggere la visibilità dei selettori e dei testi
+# Stile CSS avanzato per leggibilità perfetta e box informativi
 st.markdown(
     """
     <style>
@@ -20,9 +20,22 @@ st.markdown(
     .value-box { background-color: #064e3b; border-left: 6px solid #10b981; padding: 18px; border-radius: 10px; margin-top: 15px; color: #ecfdf5; }
     .no-value-box { background-color: #7f1d1d; border-left: 6px solid #ef4444; padding: 18px; border-radius: 10px; margin-top: 15px; color: #fef2f2; }
     
-    /* Miglioramento visibilità selettori radio */
-    div.row-widget.stRadio > div { color: #ffffff !important; font-weight: bold; }
-    div.row-widget.stRadio label { color: #ffffff !important; font-size: 15px !important; }
+    /* Box dedicati per i giocatori e calci piazzati */
+    .player-box-home { background-color: #1e293b; border-left: 6px solid #38bdf8; padding: 18px; border-radius: 10px; margin-bottom: 15px; color: #f8fafc; }
+    .player-box-away { background-color: #1e293b; border-left: 6px solid #facc15; padding: 18px; border-radius: 10px; margin-bottom: 15px; color: #f8fafc; }
+
+    /* Fix visibilità menu radio */
+    div.row-widget.stRadio label {
+        color: #ffffff !important;
+        font-weight: 600 !important;
+        font-size: 14px !important;
+    }
+    div.row-widget.stRadio div[role="radiogroup"] {
+        background-color: #1f2937;
+        padding: 10px;
+        border-radius: 10px;
+        border: 1px solid #374151;
+    }
     </style>
 """,
     unsafe_allow_html=True,
@@ -192,7 +205,6 @@ with tab_calendario:
     sq_casa = m["casa"]
     sq_trasf = m["trasferta"]
 
-    # Recupero statistiche reali o stima bilanciata coerente
     if (
         "statistiche_squadre" in locals()
         and sq_casa in statistiche_squadre
@@ -214,7 +226,6 @@ with tab_calendario:
       punti_casa = seed_c % 40
       punti_trasf = seed_t % 40
 
-    # Calcoli unificati e coerenti basati sui punti e sulla forza offensiva/difensiva
     forza_casa = punti_casa + (med_gf_casa - med_gs_casa) * 5
     forza_trasf = punti_trasf + (med_gf_trasf - med_gs_trasf) * 5
 
@@ -230,15 +241,12 @@ with tab_calendario:
     over_25_rate = min(max(int((xg_stimati / 2.8) * 100), 30), 85)
     btts_rate = min(max(int(((med_gf_casa + med_gf_trasf) / 3.0) * 100), 35), 80)
 
-    # Risultati esatti coerenti con le percentuali 1X2 e i gol stimati
-    if p_c_1x2 > p_t_1x2:
-      gol_c_est, gol_t_est = max(1, round(med_gf_casa)), round(
-          min(med_gf_trasf, med_gf_casa - 0.5)
-      )
+    if p_c_1x2 >= p_t_1x2:
+      gol_c_est = max(1, round(med_gf_casa))
+      gol_t_est = max(0, round(med_gf_trasf - 0.2))
     else:
-      gol_c_est, gol_t_est = round(min(med_gf_casa, med_gf_trasf - 0.5)), max(
-          1, round(med_gf_trasf)
-      )
+      gol_c_est = max(0, round(med_gf_casa - 0.2))
+      gol_t_est = max(1, round(med_gf_trasf))
 
     risultati_possibili = [
         (f"{gol_c_est} - {gol_t_est}", "42% Prob."),
@@ -253,7 +261,9 @@ with tab_calendario:
         else ("X2 + Over 1.5" if p_t_1x2 > 40 else "1X + Under 3.5")
     )
     combo_2 = "1X + Goal (BTTS)" if btts_rate > 50 else "X2 + No Goal"
-    combo_3 = "1 + Multigol 2-4" if p_c_1x2 > p_t_1x2 else "2 + Multigol 2-4"
+    combo_3 = (
+        "1 + Multigol 2-4" if p_c_1x2 >= p_t_1x2 else "2 + Multigol 2-4"
+    )
 
     tiri_porta_casa = round(4.0 + med_gf_casa, 1)
     tiri_porta_trasf = round(3.8 + med_gf_trasf, 1)
@@ -419,8 +429,8 @@ with tab_calendario:
             unsafe_allow_html=True,
         )
       st.info(
-          "💡 **Analisi Risultato Esatto:** Punteggi stimati coerentemente con"
-          " le percentuali di vittoria e le medie gol complessive."
+          "💡 **Analisi Risultato Esatto:** Punteggi stimati in perfetta"
+          " coerenza con le percentuali di vittoria 1X2."
       )
 
     elif focus_mercato == "⚡ Combo Consigliate":
@@ -482,23 +492,37 @@ with tab_calendario:
       st.markdown(
           "#### ⭐ Giocatori Chiave, Rigoristi e Calci Piazzati (Uomini-Bonus)"
       )
-      col_u1, col_u2 = st.columns(2)
-      with col_u1:
-        st.info(
-            f"**🏠 {sq_casa} - Reparto Offensivo & Piazzati**<br>• **Rigorista"
-            f" Principale:** Attaccante Titolare #9<br>• **Calci Piazzati /"
-            " Punizioni:** Trequartista / Playmaker<br>• **Pericolo Principale"
-            " (Bonus):** Esterno / Seconda Punta ad alto indice di xG<br>*Squadra"
-            " che produce il maggior volume offensivo dalle fasce.*"
-        )
-      with col_u2:
-        st.warning(
-            f"**✈️ {sq_trasf} - Reparto Offensivo & Piazzati**<br>• **Rigorista"
-            f" Principale:** Bomber / Punta Centrale #9<br>• **Calci Piazzati /"
-            " Angoli:** Centrocampista con piedi educati<br>• **Pericolo"
-            " Principale (Bonus):** Ala offensiva rapida in ripartenza<br>*Occhio"
-            " alle letali ripartenze in trasferta.*"
-        )
+
+      st.markdown(
+          f"""
+            <div class="player-box-home">
+                <h4>🏠 {sq_casa} - Reparto Offensivo & Piazzati</h4>
+                <ul>
+                    <li><b>Rigorista Principale:</b> Attaccante Titolare #9</li>
+                    <li><b>Calci Piazzati / Punizioni:</b> Trequartista / Playmaker di centrocampo</li>
+                    <li><b>Pericolo Principale (Bonus):</b> Estremo offensivo / Seconda punta ad alto xG</li>
+                </ul>
+                <p style="font-size:13px; color:#cbd5e1; margin-bottom:0;"><i>Squadra che produce il maggior volume offensivo dalle fasce e dagli inserimenti centrali.</i></p>
+            </div>
+        """,
+          unsafe_allow_html=True,
+      )
+
+      st.markdown(
+          f"""
+            <div class="player-box-away">
+                <h4>✈️ {sq_trasf} - Reparto Offensivo & Piazzati</h4>
+                <ul>
+                    <li><b>Rigorista Principale:</b> Bomber / Punta Centrale titolare</li>
+                    <li><b>Calci Piazzati / Angoli:</b> Centrocampista con piedi educati</li>
+                    <li><b>Pericolo Principale (Bonus):</b> Ala offensiva rapida in ripartenza</li>
+                </ul>
+                <p style="font-size:13px; color:#cbd5e1; margin-bottom:0;"><i>Attenzione alle letali ripartenze in trasferta e ai calci piazzati a favore.</i></p>
+            </div>
+        """,
+          unsafe_allow_html=True,
+      )
+
       st.success(
           "💡 **Consiglio Uomini-Bonus:** Valuta questi profili se ti piace"
           " abbinare l'analisi della partita alle giocate sui marcatori o sui"

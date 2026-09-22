@@ -246,7 +246,6 @@ with tab_classifica:
   if api_key:
     dati_classifica = scarica_classifica(api_key, codice_lega)
     if dati_classifica and "standings" in dati_classifica:
-      # Estraiamo la classifica totale
       tabellone = None
       for s in dati_classifica["standings"]:
         if s["type"] == "TOTAL":

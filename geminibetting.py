@@ -1,4 +1,4 @@
-import json
+
 import pandas as pd
 import requests
 import streamlit as st
@@ -37,11 +37,11 @@ st.markdown(
 
 st.title("⚽ Pro Betting Studio & Deep Match Analytics")
 st.markdown(
-    "Piattaforma avanzata con rose aggiornate 2026/2027, rigoristi e"
-    " uomini-bonus reali."
+    "Piattaforma multi-campionato avanzata per l'analisi statistica e il"
+    " value betting."
 )
 
-# Dizionario dei campionati supportati
+# Dizionario dei campionati supportati con codici ufficiali
 LEAGUES = {
     "Serie A (Italia)": "SA",
     "Premier League (Inghilterra)": "PL",
@@ -50,82 +50,6 @@ LEAGUES = {
     "Ligue 1 (Francia)": "FL1",
     "Eredivisie (Olanda)": "DED",
     "Champions League": "CL",
-}
-
-# Database rigorosamente aggiornato con le rose e i tiratori 2026/2027
-DATABASE_GIOCATORI = {
-    "ACF Fiorentina": {
-        "rigorista": "Albert Gudmundsson / Moise Kean",
-        "piazzati": "Albert Gudmundsson / Rolando Mandragora",
-        "pericolo": "Moise Kean / Albert Gudmundsson",
-        "nota": (
-            "Manovra offensiva basata sulla qualità di Gudmundsson e la"
-            " profondità d'attacco di Kean."
-        ),
-    },
-    "SSC Napoli": {
-        "rigorista": "Romelu Lukaku / Matteo Politano",
-        "piazzati": "Matteo Politano / Scott McTominay",
-        "pericolo": "Romelu Lukaku / David Neres",
-        "nota": (
-            "Fisicità al centro dell'attacco con Lukaku e inserimenti dalle"
-            " retrovie."
-        ),
-    },
-    "SS Lazio": {
-        "rigorista": "Mattia Zaccagni / Taty Castellanos",
-        "piazzati": "Nicolò Rovella / Mattia Zaccagni",
-        "pericolo": "Mattia Zaccagni / Taty Castellanos",
-        "nota": (
-            "Squadra verticale che sfrutta la rapidità degli esterni e gli"
-            " inserimenti."
-        ),
-    },
-    "Juventus FC": {
-        "rigorista": "Dusan Vlahovic",
-        "piazzati": "Teun Koopmeiners / Kenan Yildiz",
-        "pericolo": "Dusan Vlahovic / Kenan Yildiz",
-        "nota": (
-            "Forte pressione offensiva e ricerca sistematica del duello"
-            " nell'area avversaria."
-        ),
-    },
-    "AC Milan": {
-        "rigorista": "Christian Pulisic / Theo Hernández",
-        "piazzati": "Christian Pulisic / Tijjani Reijnders",
-        "pericolo": "Rafael Leão / Christian Pulisic",
-        "nota": (
-            "Ampiezza offensiva spiccata sulla fascia sinistra e transizioni"
-            " rapidissime."
-        ),
-    },
-    "Inter Milan": {
-        "rigorista": "Hakan Çalhanoğlu / Lautaro Martínez",
-        "piazzati": "Hakan Çalhanoğlu / Federico Dimarco",
-        "pericolo": "Lautaro Martínez / Marcus Thuram",
-        "nota": (
-            "Massima efficacia di reparto e inserimenti letali dei"
-            " centrocampisti."
-        ),
-    },
-    "Atalanta BC": {
-        "rigorista": "Mateo Retegui / Ademola Lookman",
-        "piazzati": "Charles De Ketelaere / Ademola Lookman",
-        "pericolo": "Mateo Retegui / Ademola Lookman",
-        "nota": (
-            "Intensità altissima, duelli uno contro uno e grande volume di tiri"
-            " totali."
-        ),
-    },
-    "AS Roma": {
-        "rigorista": "Paulo Dybala / Artem Dovbyk",
-        "piazzati": "Paulo Dybala / Lorenzo Pellegrini",
-        "pericolo": "Artem Dovbyk / Paulo Dybala",
-        "nota": (
-            "Grande inventiva sulla trequarti e verticalizzazioni improvvise"
-            " per le punte."
-        ),
-    },
 }
 
 # Sidebar per la configurazione
@@ -354,7 +278,6 @@ with tab_calendario:
             "Risultati Esatti",
             "⚡ Combo Consigliate",
             "🎯 Tiri & Corner",
-            "⭐ Uomini-Bonus & Piazzati",
             "Primo / Secondo Tempo",
         ],
         horizontal=True,
@@ -555,49 +478,7 @@ with tab_calendario:
         )
       st.warning(
           "💡 **Nota Corner & Tiri:** Ottimo per mercati come Over 8.5/9.5 Corner"
-          " o scommesse sui tiri in porta dei singoli giocatori chiave."
-      )
-
-    elif focus_mercato == "⭐ Uomini-Bonus & Piazzati":
-      st.markdown(
-          "#### ⭐ Giocatori Chiave, Rigoristi e Calci Piazzati (Uomini-Bonus)"
-      )
-
-      dati_casa = DATABASE_GIOCATORI.get(
-          sq_casa, {
-              "rigorista": "Rigorista Principale designato",
-              "piazzati": "Trequartista / Centrocampista",
-              "pericolo": "Attaccante / Esterno ad alto xG",
-              "nota": "Squadra solida con buon volume offensivo.",
-          }
-      )
-      dati_trasf = DATABASE_GIOCATORI.get(
-          sq_trasf, {
-              "rigorista": "Bomber principale / Rigorista",
-              "piazzati": "Centrocampista dai piedi educati",
-              "pericolo": "Ala veloce / Contropiedista",
-              "nota": "Attenzione alle ripartenze e ai piazzati a favore.",
-          }
-      )
-
-      st.markdown(f"### 🏠 {sq_casa} - Reparto Offensivo & Piazzati")
-      st.markdown(f"- **Rigorista Principale:** {dati_casa['rigorista']}")
-      st.markdown(f"- **Calci Piazzati / Punizioni:** {dati_casa['piazzati']}")
-      st.markdown(f"- **Pericolo Principale (Bonus):** {dati_casa['pericolo']}")
-      st.caption(f"ℹ️ *{dati_casa['nota']}*")
-
-      st.markdown("---")
-
-      st.markdown(f"### ✈️ {sq_trasf} - Reparto Offensivo & Piazzati")
-      st.markdown(f"- **Rigorista Principale:** {dati_trasf['rigorista']}")
-      st.markdown(f"- **Calci Piazzati / Angoli:** {dati_trasf['piazzati']}")
-      st.markdown(f"- **Pericolo Principale (Bonus):** {dati_trasf['pericolo']}")
-      st.caption(f"ℹ️ *{dati_trasf['nota']}*")
-
-      st.success(
-          "💡 **Consiglio Uomini-Bonus:** Valuta questi profili se ti piace"
-          " abbinare l'analisi della partita alle giocate sui marcatori o sui"
-          " tiri in porta dei singoli."
+          " o scommesse sui tiri in porta di squadra."
       )
 
     elif focus_mercato == "Primo / Secondo Tempo":

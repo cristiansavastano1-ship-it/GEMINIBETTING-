@@ -9,7 +9,7 @@ st.set_page_config(
     page_icon="⚽",
 )
 
-# Stile CSS avanzato per leggibilità perfetta e box informativi
+# Stile CSS avanzato con override totale per la leggibilità del menu
 st.markdown(
     """
     <style>
@@ -20,21 +20,14 @@ st.markdown(
     .value-box { background-color: #064e3b; border-left: 6px solid #10b981; padding: 18px; border-radius: 10px; margin-top: 15px; color: #ecfdf5; }
     .no-value-box { background-color: #7f1d1d; border-left: 6px solid #ef4444; padding: 18px; border-radius: 10px; margin-top: 15px; color: #fef2f2; }
     
-    /* Box dedicati per i giocatori e calci piazzati */
-    .player-box-home { background-color: #1e293b; border-left: 6px solid #38bdf8; padding: 18px; border-radius: 10px; margin-bottom: 15px; color: #f8fafc; }
-    .player-box-away { background-color: #1e293b; border-left: 6px solid #facc15; padding: 18px; border-radius: 10px; margin-bottom: 15px; color: #f8fafc; }
-
-    /* Fix visibilità menu radio */
-    div.row-widget.stRadio label {
+    /* FIX DEFINITIVO E AGGRESSIVO PER I TESTI DEL RADIO BUTTON */
+    div.row-widget.stRadio div[role="radiogroup"] label p {
         color: #ffffff !important;
-        font-weight: 600 !important;
-        font-size: 14px !important;
+        font-weight: 700 !important;
+        font-size: 15px !important;
     }
-    div.row-widget.stRadio div[role="radiogroup"] {
-        background-color: #1f2937;
-        padding: 10px;
-        border-radius: 10px;
-        border: 1px solid #374151;
+    div.row-widget.stRadio div[role="radiogroup"] label {
+        color: #ffffff !important;
     }
     </style>
 """,
@@ -43,8 +36,7 @@ st.markdown(
 
 st.title("⚽ Pro Betting Studio & Deep Match Analytics")
 st.markdown(
-    "Piattaforma avanzata con analisi dinamica, coerenza statistica e mercati"
-    " mirati."
+    "Piattaforma avanzata con analisi dinamica, rigoristi e uomini-bonus reali."
 )
 
 # Dizionario dei campionati supportati
@@ -56,6 +48,67 @@ LEAGUES = {
     "Ligue 1 (Francia)": "FL1",
     "Eredivisie (Olanda)": "DED",
     "Champions League": "CL",
+}
+
+# Database di riferimento per Rigoristi, Piazzati e Uomini-Bonus
+DATABASE_GIOCATORI = {
+    "SS Lazio": {
+        "rigorista": "Ciro Immobile / Mattia Zaccagni",
+        "piazzati": "Luis Alberto / Nicolò Rovella",
+        "pericolo": "Taty Castellanos / Pedro",
+        "nota": (
+            "Squadra che costruisce molto sulla trequarti e verticalizza"
+            " rapidamente."
+        ),
+    },
+    "Juventus FC": {
+        "rigorista": "Dusan Vlahovic",
+        "piazzati": "Teun Koopmeiners / Kenan Yildiz",
+        "pericolo": "Dusan Vlahovic / Francisco Conceição",
+        "nota": "Forte pressione offensiva e grande pericolosità sui piazzati.",
+    },
+    "AC Milan": {
+        "rigorista": "Christian Pulisic / Theo Hernández",
+        "piazzati": "Christian Pulisic / Tijjani Reijnders",
+        "pericolo": "Rafael Leão / Álvaro Morata",
+        "nota": (
+            "Ampiezza offensiva spiccata sulle fasce sinistre e transizioni"
+            " veloci."
+        ),
+    },
+    "Inter Milan": {
+        "rigorista": "Hakan Çalhanoğlu / Lautaro Martínez",
+        "piazzati": "Hakan Çalhanoğlu / Federico Dimarco",
+        "pericolo": "Lautaro Martínez / Marcus Thuram",
+        "nota": (
+            "Massima efficacia realizzativa di reparto e inserimenti dei"
+            " centrocampisti."
+        ),
+    },
+    "Atalanta BC": {
+        "rigorista": "Mateo Retegui",
+        "piazzati": "Charles De Ketelaere / Ademola Lookman",
+        "pericolo": "Mateo Retegui / Ademola Lookman",
+        "nota": (
+            "Intensità altissima, duelli uno contro uno e grande volume di tiri"
+            " totali."
+        ),
+    },
+    "AS Roma": {
+        "rigorista": "Paulo Dybala / Artem Dovbyk",
+        "piazzati": "Paulo Dybala / Lorenzo Pellegrini",
+        "pericolo": "Artem Dovbyk / Paulo Dybala",
+        "nota": "Qualità tecnica elevata negli ultimi 25 metri e tiri da fuori.",
+    },
+    "SSC Napoli": {
+        "rigorista": "Khvicha Kvaratskhelia / Matteo Politano",
+        "piazzati": "Matteo Politano / Kevin De Bruyne (Jolly)",
+        "pericolo": "Romelu Lukaku / Khvicha Kvaratskhelia",
+        "nota": (
+            "Attacco strutturato centralmente con scarichi laterali e spinta"
+            " dei terzini."
+        ),
+    },
 }
 
 # Sidebar per la configurazione
@@ -493,35 +546,36 @@ with tab_calendario:
           "#### ⭐ Giocatori Chiave, Rigoristi e Calci Piazzati (Uomini-Bonus)"
       )
 
-      st.markdown(
-          f"""
-            <div class="player-box-home">
-                <h4>🏠 {sq_casa} - Reparto Offensivo & Piazzati</h4>
-                <ul>
-                    <li><b>Rigorista Principale:</b> Attaccante Titolare #9</li>
-                    <li><b>Calci Piazzati / Punizioni:</b> Trequartista / Playmaker di centrocampo</li>
-                    <li><b>Pericolo Principale (Bonus):</b> Estremo offensivo / Seconda punta ad alto xG</li>
-                </ul>
-                <p style="font-size:13px; color:#cbd5e1; margin-bottom:0;"><i>Squadra che produce il maggior volume offensivo dalle fasce e dagli inserimenti centrali.</i></p>
-            </div>
-        """,
-          unsafe_allow_html=True,
+      dati_casa = DATABASE_GIOCATORI.get(
+          sq_casa, {
+              "rigorista": "Attaccante Titolare #9",
+              "piazzati": "Trequartista / Playmaker",
+              "pericolo": "Esterno Offensivo / Seconda Punta",
+              "nota": "Squadra solida con buon volume offensivo.",
+          }
+      )
+      dati_trasf = DATABASE_GIOCATORI.get(
+          sq_trasf, {
+              "rigorista": "Bomber Principale",
+              "piazzati": "Centrocampista dai piedi educati",
+              "pericolo": "Ala veloce / Contropiedista",
+              "nota": "Attenzione alle ripartenze e ai piazzati.",
+          }
       )
 
-      st.markdown(
-          f"""
-            <div class="player-box-away">
-                <h4>✈️ {sq_trasf} - Reparto Offensivo & Piazzati</h4>
-                <ul>
-                    <li><b>Rigorista Principale:</b> Bomber / Punta Centrale titolare</li>
-                    <li><b>Calci Piazzati / Angoli:</b> Centrocampista con piedi educati</li>
-                    <li><b>Pericolo Principale (Bonus):</b> Ala offensiva rapida in ripartenza</li>
-                </ul>
-                <p style="font-size:13px; color:#cbd5e1; margin-bottom:0;"><i>Attenzione alle letali ripartenze in trasferta e ai calci piazzati a favore.</i></p>
-            </div>
-        """,
-          unsafe_allow_html=True,
-      )
+      st.markdown(f"### 🏠 {sq_casa} - Reparto Offensivo & Piazzati")
+      st.markdown(f"- **Rigorista Principale:** {dati_casa['rigorista']}")
+      st.markdown(f"- **Calci Piazzati / Punizioni:** {dati_casa['piazzati']}")
+      st.markdown(f"- **Pericolo Principale (Bonus):** {dati_casa['pericolo']}")
+      st.caption(f"ℹ️ *{dati_casa['nota']}*")
+
+      st.markdown("---")
+
+      st.markdown(f"### ✈️ {sq_trasf} - Reparto Offensivo & Piazzati")
+      st.markdown(f"- **Rigorista Principale:** {dati_trasf['rigorista']}")
+      st.markdown(f"- **Calci Piazzati / Angoli:** {dati_trasf['piazzati']}")
+      st.markdown(f"- **Pericolo Principale (Bonus):** {dati_trasf['pericolo']}")
+      st.caption(f"ℹ️ *{dati_trasf['nota']}*")
 
       st.success(
           "💡 **Consiglio Uomini-Bonus:** Valuta questi profili se ti piace"

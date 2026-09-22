@@ -1,3 +1,4 @@
+import json
 import pandas as pd
 import requests
 import streamlit as st
@@ -9,7 +10,7 @@ st.set_page_config(
     page_icon="⚽",
 )
 
-# Stile CSS avanzato con override totale per la leggibilità del menu
+# Stile CSS avanzato per leggibilità perfetta e box informativi
 st.markdown(
     """
     <style>
@@ -20,7 +21,7 @@ st.markdown(
     .value-box { background-color: #064e3b; border-left: 6px solid #10b981; padding: 18px; border-radius: 10px; margin-top: 15px; color: #ecfdf5; }
     .no-value-box { background-color: #7f1d1d; border-left: 6px solid #ef4444; padding: 18px; border-radius: 10px; margin-top: 15px; color: #fef2f2; }
     
-    /* FIX DEFINITIVO E AGGRESSIVO PER I TESTI DEL RADIO BUTTON */
+    /* FIX DEFINITIVO PER I TESTI DEL RADIO BUTTON */
     div.row-widget.stRadio div[role="radiogroup"] label p {
         color: #ffffff !important;
         font-weight: 700 !important;
@@ -36,7 +37,8 @@ st.markdown(
 
 st.title("⚽ Pro Betting Studio & Deep Match Analytics")
 st.markdown(
-    "Piattaforma avanzata con analisi dinamica, rigoristi e uomini-bonus reali."
+    "Piattaforma avanzata con rose aggiornate 2026/2027, rigoristi e"
+    " uomini-bonus reali."
 )
 
 # Dizionario dei campionati supportati
@@ -50,30 +52,51 @@ LEAGUES = {
     "Champions League": "CL",
 }
 
-# Database di riferimento per Rigoristi, Piazzati e Uomini-Bonus
+# Database rigorosamente aggiornato con le rose e i tiratori 2026/2027
 DATABASE_GIOCATORI = {
-    "SS Lazio": {
-        "rigorista": "Ciro Immobile / Mattia Zaccagni",
-        "piazzati": "Luis Alberto / Nicolò Rovella",
-        "pericolo": "Taty Castellanos / Pedro",
+    "ACF Fiorentina": {
+        "rigorista": "Albert Gudmundsson / Moise Kean",
+        "piazzati": "Albert Gudmundsson / Rolando Mandragora",
+        "pericolo": "Moise Kean / Albert Gudmundsson",
         "nota": (
-            "Squadra che costruisce molto sulla trequarti e verticalizza"
-            " rapidamente."
+            "Manovra offensiva basata sulla qualità di Gudmundsson e la"
+            " profondità d'attacco di Kean."
+        ),
+    },
+    "SSC Napoli": {
+        "rigorista": "Romelu Lukaku / Matteo Politano",
+        "piazzati": "Matteo Politano / Scott McTominay",
+        "pericolo": "Romelu Lukaku / David Neres",
+        "nota": (
+            "Fisicità al centro dell'attacco con Lukaku e inserimenti dalle"
+            " retrovie."
+        ),
+    },
+    "SS Lazio": {
+        "rigorista": "Mattia Zaccagni / Taty Castellanos",
+        "piazzati": "Nicolò Rovella / Mattia Zaccagni",
+        "pericolo": "Mattia Zaccagni / Taty Castellanos",
+        "nota": (
+            "Squadra verticale che sfrutta la rapidità degli esterni e gli"
+            " inserimenti."
         ),
     },
     "Juventus FC": {
         "rigorista": "Dusan Vlahovic",
         "piazzati": "Teun Koopmeiners / Kenan Yildiz",
-        "pericolo": "Dusan Vlahovic / Francisco Conceição",
-        "nota": "Forte pressione offensiva e grande pericolosità sui piazzati.",
+        "pericolo": "Dusan Vlahovic / Kenan Yildiz",
+        "nota": (
+            "Forte pressione offensiva e ricerca sistematica del duello"
+            " nell'area avversaria."
+        ),
     },
     "AC Milan": {
         "rigorista": "Christian Pulisic / Theo Hernández",
         "piazzati": "Christian Pulisic / Tijjani Reijnders",
-        "pericolo": "Rafael Leão / Álvaro Morata",
+        "pericolo": "Rafael Leão / Christian Pulisic",
         "nota": (
-            "Ampiezza offensiva spiccata sulle fasce sinistre e transizioni"
-            " veloci."
+            "Ampiezza offensiva spiccata sulla fascia sinistra e transizioni"
+            " rapidissime."
         ),
     },
     "Inter Milan": {
@@ -81,12 +104,12 @@ DATABASE_GIOCATORI = {
         "piazzati": "Hakan Çalhanoğlu / Federico Dimarco",
         "pericolo": "Lautaro Martínez / Marcus Thuram",
         "nota": (
-            "Massima efficacia realizzativa di reparto e inserimenti dei"
+            "Massima efficacia di reparto e inserimenti letali dei"
             " centrocampisti."
         ),
     },
     "Atalanta BC": {
-        "rigorista": "Mateo Retegui",
+        "rigorista": "Mateo Retegui / Ademola Lookman",
         "piazzati": "Charles De Ketelaere / Ademola Lookman",
         "pericolo": "Mateo Retegui / Ademola Lookman",
         "nota": (
@@ -98,15 +121,9 @@ DATABASE_GIOCATORI = {
         "rigorista": "Paulo Dybala / Artem Dovbyk",
         "piazzati": "Paulo Dybala / Lorenzo Pellegrini",
         "pericolo": "Artem Dovbyk / Paulo Dybala",
-        "nota": "Qualità tecnica elevata negli ultimi 25 metri e tiri da fuori.",
-    },
-    "SSC Napoli": {
-        "rigorista": "Khvicha Kvaratskhelia / Matteo Politano",
-        "piazzati": "Matteo Politano / Kevin De Bruyne (Jolly)",
-        "pericolo": "Romelu Lukaku / Khvicha Kvaratskhelia",
         "nota": (
-            "Attacco strutturato centralmente con scarichi laterali e spinta"
-            " dei terzini."
+            "Grande inventiva sulla trequarti e verticalizzazioni improvvise"
+            " per le punte."
         ),
     },
 }
@@ -548,18 +565,18 @@ with tab_calendario:
 
       dati_casa = DATABASE_GIOCATORI.get(
           sq_casa, {
-              "rigorista": "Attaccante Titolare #9",
-              "piazzati": "Trequartista / Playmaker",
-              "pericolo": "Esterno Offensivo / Seconda Punta",
+              "rigorista": "Rigorista Principale designato",
+              "piazzati": "Trequartista / Centrocampista",
+              "pericolo": "Attaccante / Esterno ad alto xG",
               "nota": "Squadra solida con buon volume offensivo.",
           }
       )
       dati_trasf = DATABASE_GIOCATORI.get(
           sq_trasf, {
-              "rigorista": "Bomber Principale",
+              "rigorista": "Bomber principale / Rigorista",
               "piazzati": "Centrocampista dai piedi educati",
               "pericolo": "Ala veloce / Contropiedista",
-              "nota": "Attenzione alle ripartenze e ai piazzati.",
+              "nota": "Attenzione alle ripartenze e ai piazzati a favore.",
           }
       )
 

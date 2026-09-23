@@ -2,6 +2,7 @@ import math
 import pandas as pd
 import numpy as np
 import plotly.express as px
+import plotly.graph_objects as go
 import requests
 import streamlit as st
 
@@ -45,7 +46,7 @@ else:
     radio_bg = "#e2e8f0"
     radio_text = "#0f172a"
 
-# Iniezione Stile CSS Dinamico (Parentesi graffe CSS raddoppiate per le f-string)
+# Iniezione Stile CSS Dinamico
 st.markdown(
     f"""
     <style>
@@ -129,7 +130,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 st.markdown(
-    f"<p style='text-align: center; color: {text_muted}; font-size: 16px; margin-bottom: 30px;'>Piattaforma professionale di analisi statistica calcistica basata su Poisson, xG, Value Betting & AI Smart Acca.</p>",
+    f"<p style='text-align: center; color: {text_muted}; font-size: 16px; margin-bottom: 30px;'>Piattaforma professionale di analisi statistica calcistica basata su Poisson, xG, Value Betting, AI Smart Acca & Simulazioni Monte Carlo.</p>",
     unsafe_allow_html=True,
 )
 
@@ -152,14 +153,15 @@ campionato_scelto = st.sidebar.selectbox(
 )
 codice_lega = LEAGUES[campionato_scelto]
 
-# Tab di navigazione principali
-tab_calendario, tab_classifica, tab_value, tab_grafici, tab_ai_schedine, tab_value_finder = st.tabs([
+# Tab di navigazione principali (Aggiunto il Tab Monte Carlo)
+tab_calendario, tab_classifica, tab_value, tab_grafici, tab_ai_schedine, tab_value_finder, tab_monte_carlo = st.tabs([
     "📅 Calendario & Studio Match",
     "🏆 Classifica & Export",
     "🔍 Calcolatore Value Bet",
     "📊 Grafici & Trend",
     "🤖 Schedine Smart & AI",
-    "⚡ Value Finder Automatico"
+    "⚡ Value Finder",
+    "🎲 Simulatore Monte Carlo"
 ])
 
 
@@ -713,3 +715,98 @@ with tab_value_finder:
         )
     else:
         st.info("⚠️ Carica i dati tramite l'API Key nella barra laterale per avviare lo scanner automatico delle value bet.")
+
+# --- TAB 7: SIMULATORE MONTE CARLO & PLAYER IMPACT ---
+with tab_monte_carlo:
+    st.subheader("🎲 Simulatore Stocastico Monte Carlo & Player Impact")
+    st.markdown("Esegui migliaia di simulazioni virtuali del match selezionando le squadre e applicando correttivi tattici o di assenza singoli calciatori.")
+
+    if statistiche_squadre:
+        nomi_squadre = sorted(list(statistiche_squadre.keys()))
+        
+        col_mc1, col_mc2 = st.columns(2)
+        with col_mc1:
+            sq_c_sim = st.selectbox("🏠 Squadra di Casa", nomi_squadre, index=0)
+        with col_mc2:
+            sq_t_sim = st.selectbox("✈️ Squadra Ospite", nomi_squadre, index=min(1, len(nomi_squadre)-1))
+
+        st.markdown("---")
+        st.markdown("##### ⚙️ Parametri Avanzati di Simulazione & Fattori di Impatto")
+        
+        col_p1, col_p2, col_p3 = st.columns(3)
+        with col_p1:
+            num_iterazioni = st.selectbox("Numero di Simulazioni", [1000, 5000, 10000], index=1)
+        with col_p2:
+            impatto_assenza_casa = st.slider(f"Modificatore Offensivo {sq_c_sim}", -30, 30, 0, 5, format="%d%%")
+        with col_p3:
+            impatto_assenza_trasf = st.slider(f"Modificatore Offensivo {sq_t_sim}", -30, 30, 0, 5, format="%d%%")
+
+        if st.button("🚀 Avvia Simulazione Monte Carlo"):
+            lam_base_c = statistiche_squadre[sq_c_sim]["media_gf"]
+            lam_base_t = statistiche_squadre[sq_t_sim]["media_gf"]
+
+            # Applica i modificatori di impatto calciatori / assenze
+            lam_effettiva_c = max(0.1, lam_base_c * (1 + impatto_assenza_casa / 100.0))
+            lam_effettiva_t = max(0.1, lam_base_t * (1 + impatto_assenza_trasf / 100.0))
+
+            # Esecuzione simulazione Monte Carlo con NumPy
+            np.random.seed(42)
+            gol_casa_sim = np.random.poisson(lam_effettiva_c, num_iterazioni)
+            gol_trasf_sim = np.random.poisson(lam_effettiva_t, num_iterazioni)
+
+            # Calcolo metriche derivate
+            vittorie_casa = np.sum(gol_casa_sim > gol_trasf_sim)
+            pareggi = np.sum(gol_casa_sim == gol_trasf_sim)
+            vittorie_trasf = np.sum(gol_casa_sim < gol_trasf_sim)
+
+            prob_c = (vittorie_casa / num_iterazioni) * 100
+            prob_p = (pareggi / num_iterazioni) * 100
+            prob_t = (vittorie_trasf / num_iterazioni) * 100
+
+            st.markdown("---")
+            st.markdown(f"### 📊 Risultati Simulazione ({num_iterazioni:,} iterazioni virtuali)")
+
+            mc1, mc2, mc3 = st.columns(3)
+            mc1.metric(f"Vittoria {sq_c_sim} (1)", f"{prob_c:.1f}%")
+            mc2.metric("Pareggio (X)", f"{prob_p:.1f}%")
+            mc3.metric(f"Vittoria {sq_t_sim} (2)", f"{prob_t:.1f}%")
+
+            # Creazione Heatmap Risultati Esatti
+            st.markdown("##### 🌡️ Matrice di Calore dei Risultati Esatti più Frequenti")
+            
+            # Matrice 5x5 per i gol (da 0 a 4)
+            matrice_risultati = np.zeros((5, 5))
+            for gc, gt in zip(gol_casa_sim, gol_trasf_sim):
+                if gc <= 4 and gt <= 4:
+                    matrice_risultati[gc, gt] += 1
+            matrice_risultati_perc = (matrice_risultati / num_iterazioni) * 100
+
+            etichette_gol = ["0", "1", "2", "3", "4+"]
+            fig_heatmap = px.imshow(
+                matrice_risultati_perc[:5, :5],
+                labels=dict(x=f"Gol {sq_t_sim}", y=f"Gol {sq_c_sim}", color="Probabilità (%)"),
+                x=etichette_gol,
+                y=etichette_gol,
+                text_auto=".1f",
+                color_continuous_scale="Teal",
+                template=plotly_template
+            )
+            fig_heatmap.update_layout(height=450, margin=dict(l=10, r=10, t=10, b=10))
+            st.plotly_chart(fig_heatmap, use_container_width=True)
+
+            # Box di sintesi e Explainable AI
+            st.markdown(
+                f"""
+                <div class="analysis-container">
+                    <h4>💡 Insight di Sintesi dell'IA</h4>
+                    <ul>
+                        <li><b>Aspettativa Gol Corretta ({sq_c_sim}):</b> {lam_effettiva_c:.2f} (Base: {lam_base_c:.2f})</li>
+                        <li><b>Aspettativa Gol Corretta ({sq_t_sim}):</b> {lam_effettiva_t:.2f} (Base: {lam_base_t:.2f})</li>
+                        <li><b>Indice di Volatilità del Match:</b> {'Basso (Incontro stabile)' if abs(prob_c - prob_t) > 25 else 'Alto (Match imprevedibile e aperto)'}</li>
+                    </ul>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+    else:
+        st.info("⚠️ Carica i dati del campionato inserendo l'API Key nella barra laterale per abilitare le simulazioni Monte Carlo tra le squadre.")

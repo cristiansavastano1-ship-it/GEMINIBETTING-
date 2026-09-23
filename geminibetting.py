@@ -12,48 +12,81 @@ st.set_page_config(
     page_icon="⚽",
 )
 
-# Stile CSS avanzato, moderno e curato nei dettagli
+# --- GESTIONE DINAMICA TEMA (DARK / LIGHT MODE) ---
+st.sidebar.markdown("### ⚙️ Pannello di Controllo", unsafe_allow_html=True)
+
+# Selettore Tema nella Sidebar
+tema_selezionato = st.sidebar.radio(
+    "🎨 Tema Grafico", ["🌙 Dark Mode", "☀️ Light Mode"], horizontal=True
+)
+
+if tema_selezionato == "🌙 Dark Mode":
+    bg_app = "#0b0f19"
+    text_app = "#f8fafc"
+    card_bg = "linear-gradient(135deg, #111827 0%, #1f2937 100%)"
+    card_border = "#374151"
+    analysis_bg = "#111827"
+    metric_bg = "#1f2937"
+    metric_border = "#4b5563"
+    text_muted = "#94a3b8"
+    plotly_template = "plotly_dark"
+    radio_bg = "#1f2937"
+    radio_text = "#ffffff"
+else:
+    bg_app = "#f8fafc"
+    text_app = "#0f172a"
+    card_bg = "linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%)"
+    card_border = "#cbd5e1"
+    analysis_bg = "#ffffff"
+    metric_bg = "#f1f5f9"
+    metric_border = "#e2e8f0"
+    text_muted = "#64748b"
+    plotly_template = "plotly"
+    radio_bg = "#e2e8f0"
+    radio_text = "#0f172a"
+
+# Iniezione Stile CSS Dinamico
 st.markdown(
-    """
+    f"""
     <style>
-    .stApp { background-color: #0b0f19; color: #f8fafc; }
+    .stApp {{ background-color: {bg_app}; color: {text_app}; }}
     
     /* Card delle partite */
-    .match-card { 
-        background: linear-gradient(135deg, #111827 0%, #1f2937 100%); 
+    .match-card {{ 
+        background: {card_bg}; 
         padding: 20px; 
         border-radius: 14px; 
-        border: 1px solid #374151; 
+        border: 1px solid {card_border}; 
         margin-bottom: 14px; 
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
         transition: transform 0.2s ease;
     }
-    .match-card:hover {
+    .match-card:hover {{
         border-color: #38bdf8;
     }
     
     /* Container di analisi dettagliata */
-    .analysis-container { 
-        background-color: #111827; 
+    .analysis-container {{ 
+        background-color: {analysis_bg}; 
         padding: 30px; 
         border-radius: 16px; 
-        border: 1px solid #374151; 
+        border: 1px solid {card_border}; 
         margin-top: 25px; 
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); 
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1); 
     }
     
     /* Box metriche */
-    .metric-box { 
-        background: #1f2937; 
+    .metric-box {{ 
+        background: {metric_bg}; 
         padding: 18px; 
         border-radius: 12px; 
-        border: 1px solid #4b5563; 
+        border: 1px solid {metric_border}; 
         text-align: center; 
-        box-shadow: inset 0 2px 4px rgba(255,255,255,0.05);
+        box-shadow: inset 0 2px 4px rgba(255,255,255,0.02);
     }
     
     /* Box esito Value Bet */
-    .value-box { 
+    .value-box {{ 
         background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); 
         border-left: 6px solid #10b981; 
         padding: 20px; 
@@ -62,7 +95,7 @@ st.markdown(
         color: #ecfdf5; 
         box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
     }
-    .no-value-box { 
+    .no-value-box {{ 
         background: linear-gradient(135deg, #7f1d1d 0%, #450a0a 100%); 
         border-left: 6px solid #ef4444; 
         padding: 20px; 
@@ -73,16 +106,16 @@ st.markdown(
     }
     
     /* Radio button personalizzati */
-    div.row-widget.stRadio div[role="radiogroup"] label p {
-        color: #ffffff !important;
+    div.row-widget.stRadio div[role="radiogroup"] label p {{
+        color: {radio_text} !important;
         font-weight: 600 !important;
         font-size: 15px !important;
-    }
-    div.row-widget.stRadio div[role="radiogroup"] label {
-        background-color: #1f2937;
+    }}
+    div.row-widget.stRadio div[role="radiogroup"] label {{
+        background-color: {radio_bg};
         padding: 6px 14px;
         border-radius: 8px;
-        border: 1px solid #374151;
+        border: 1px solid {card_border};
         margin-right: 8px;
     }
     </style>
@@ -90,13 +123,13 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Header principale con stile pulito
+# Header principale
 st.markdown(
-    "<h1 style='text-align: center; color: #f8fafc; font-weight: 800;'>⚽ PRO BETTING STUDIO & ANALYTICS</h1>",
+    f"<h1 style='text-align: center; color: {text_app}; font-weight: 800;'>⚽ PRO BETTING STUDIO & ANALYTICS</h1>",
     unsafe_allow_html=True,
 )
 st.markdown(
-    "<p style='text-align: center; color: #94a3b8; font-size: 16px; margin-bottom: 30px;'>Piattaforma professionale di analisi statistica calcistica basata su Poisson, xG, Value Betting & AI Smart Acca.</p>",
+    f"<p style='text-align: center; color: {text_muted}; font-size: 16px; margin-bottom: 30px;'>Piattaforma professionale di analisi statistica calcistica basata su Poisson, xG, Value Betting & AI Smart Acca.</p>",
     unsafe_allow_html=True,
 )
 
@@ -110,10 +143,6 @@ LEAGUES = {
     "Champions League": "CL",
 }
 
-# Sidebar migliorata
-st.sidebar.markdown(
-    "### ⚙️ Pannello di Controllo", unsafe_allow_html=True
-)
 api_key = st.sidebar.text_input(
     "🔑 Inserisci API Key (football-data.org)", type="password"
 )
@@ -123,7 +152,7 @@ campionato_scelto = st.sidebar.selectbox(
 )
 codice_lega = LEAGUES[campionato_scelto]
 
-# Tab di navigazione principali estesi con le nuove sezioni AI
+# Tab di navigazione principali
 tab_calendario, tab_classifica, tab_value, tab_grafici, tab_ai_schedine, tab_value_finder = st.tabs([
     "📅 Calendario & Studio Match",
     "🏆 Classifica & Export",
@@ -187,7 +216,6 @@ def calcola_forma_recente(matches_list, nome_squadra):
     return "".join(ultime) if ultime else "N/D"
 
 
-# Caricamento preliminare dati per alimentare le sezioni
 statistiche_squadre = {}
 matches_raw = []
 
@@ -258,12 +286,12 @@ with tab_calendario:
                         c1, c2, c3 = st.columns([3, 2, 2])
                         with c1:
                             st.markdown(
-                                f"🏠 **{row['casa']}**<br>✈️ **{row['trasferta']}**<br><span style='color:#94a3b8; font-size:12px;'>📅 {row['data']} ore {row['ora']}</span>",
+                                f"🏠 **{row['casa']}**<br>✈️ **{row['trasferta']}**<br><span style='color:{text_muted}; font-size:12px;'>📅 {row['data']} ore {row['ora']}</span>",
                                 unsafe_allow_html=True,
                             )
                         with c2:
                             st.markdown(
-                                f"<br>Risultato: <b style='font-size:18px; color:#38bdf8;'>{row['gol_casa']} - {row['gol_trasf']}</b><br><span style='font-size:11px; color:#94a3b8;'>Stato: {row['stato']}</span>",
+                                f"<br>Risultato: <b style='font-size:18px; color:#38bdf8;'>{row['gol_casa']} - {row['gol_trasf']}</b><br><span style='font-size:11px; color:{text_muted};'>Stato: {row['stato']}</span>",
                                 unsafe_allow_html=True,
                             )
                         with c3:
@@ -341,7 +369,7 @@ with tab_calendario:
         st.markdown('<div class="analysis-container">', unsafe_allow_html=True)
         st.markdown(f"<h2>🔬 Analisi Scientifica: {sq_casa} vs {sq_trasf}</h2>", unsafe_allow_html=True)
         st.markdown(
-            f"<p style='color: #94a3b8;'>Forma Recente (Ultime 5): 🏠 <b>{sq_casa}</b> [{forma_casa}] &nbsp;|&nbsp; ✈️ <b>{sq_trasf}</b> [{forma_trasf}]</p>",
+            f"<p style='color: {text_muted};'>Forma Recente (Ultime 5): 🏠 <b>{sq_casa}</b> [{forma_casa}] &nbsp;|&nbsp; ✈️ <b>{sq_trasf}</b> [{forma_trasf}]</p>",
             unsafe_allow_html=True,
         )
 
@@ -395,7 +423,7 @@ with tab_calendario:
             for i in range(4):
                 res_str, prob_val = risultati_esatti_list[i]
                 with [col1, col2, col3, col4][i]:
-                    st.markdown(f'<div class="metric-box"><b>Top {i+1}</b><br><span style="font-size:22px; color:#10b981;">{res_str}</span><br><span style="font-size:12px; color:#94a3b8;">{prob_val:.1f}%</span></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="metric-box"><b>Top {i+1}</b><br><span style="font-size:22px; color:#10b981;">{res_str}</span><br><span style="font-size:12px; color:{text_muted};">{prob_val:.1f}%</span></div>', unsafe_allow_html=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -502,7 +530,7 @@ with tab_grafici:
                 y="Punti",
                 color="Punti",
                 color_continuous_scale="Viridis",
-                template="plotly_dark",
+                template=plotly_template,
             )
             fig_punti.update_layout(xaxis_tickangle=-45, margin=dict(l=10, r=10, t=10, b=10), height=420)
             st.plotly_chart(fig_punti, use_container_width=True)
@@ -517,7 +545,7 @@ with tab_grafici:
                 size="Punti",
                 color="DR",
                 color_continuous_scale="Bluered",
-                template="plotly_dark",
+                template=plotly_template,
             )
             fig_gol.update_traces(textposition="top center", marker=dict(size=12))
             fig_gol.update_layout(margin=dict(l=10, r=10, t=10, b=10), height=420)
@@ -525,9 +553,8 @@ with tab_grafici:
     else:
         st.info("Carica prima la classifica nel Tab 2 inserendo la chiave API per visualizzare i grafici.")
 
-# --- FUNZIONE DI SUPPORTO PER GENERAZIONE ANALISI AUTOMATICA MATCH ---
+
 def genera_dataset_valore(matches_list, stats_dict):
-    """Scansiona tutte le partite scheduled/finished per estrarre opportunità e calcolare edge."""
     righe_valore = []
     if not matches_list or not stats_dict:
         return pd.DataFrame()
@@ -539,7 +566,6 @@ def genera_dataset_valore(matches_list, stats_dict):
             lam_c = stats_dict[h]["media_gf"]
             lam_t = stats_dict[a]["media_gf"]
             
-            # Calcolo Poisson 1X2 semplificato
             max_g = 4
             pc, pp, pt = 0.0, 0.0, 0.0
             for rc in range(max_g + 1):
@@ -554,10 +580,8 @@ def genera_dataset_valore(matches_list, stats_dict):
             else:
                 pc, pp, pt = 0.33, 0.33, 0.34
 
-            # Selezioniamo il mercato con probabilità maggiore o Over 2.5
             over_prob = sum(poisson_prob(lam_c, rc) * poisson_prob(lam_t, rt) for rc in range(5) for rt in range(5) if rc + rt > 2.5)
             
-            # Assegnamo una quota teorica di mercato simulata coerente col modello + margine bookmaker (1.05)
             if pc >= pt and pc >= 0.45:
                 mercato = "1X2"
                 selezione = f"1 ({h})"
@@ -581,7 +605,6 @@ def genera_dataset_valore(matches_list, stats_dict):
 
             edge = round(((prob_mod * quota_book) - 1) * 100, 1)
 
-            # Classificazione rischio
             if quota_book < 1.50 and prob_mod > 0.65:
                 rischio = "Basso"
             elif 1.50 <= quota_book <= 2.20:
@@ -604,7 +627,7 @@ def genera_dataset_valore(matches_list, stats_dict):
 
 df_valore_generato = genera_dataset_valore(matches_raw, statistiche_squadre)
 
-# --- TAB 5: SCHEDINE SMART & AI (CON FILTRO GIORNATA INTEGRATO) ---
+# --- TAB 5: SCHEDINE SMART & AI ---
 with tab_ai_schedine:
     st.subheader("🤖 Generatore Automatico di Schedine & Accumulatori Smart")
     st.markdown("Seleziona la **giornata** di riferimento: l'IA combinerà le migliori selezioni esclusivamente all'interno dello **stesso turno di campionato**.")
@@ -620,7 +643,6 @@ with tab_ai_schedine:
         with col_g3:
             num_eventi = st.slider("🔢 Numero di eventi in combo", 2, 5, 3)
 
-        # FILTRO FONDAMENTALE: Isola solo le partite della giornata selezionata
         df_giornata = df_valore_generato[df_valore_generato["Giornata"] == giornata_scelta]
 
         if "Basso" in profilo_rischio:
@@ -647,7 +669,7 @@ with tab_ai_schedine:
             st.markdown(f"#### 📋 Dettaglio Selezioni Smart - Giornata {giornata_scelta}:")
             for idx, row in subset_smart.iterrows():
                 st.markdown(
-                    f"""<div style='background:#1f2937; padding:12px 18px; border-radius:10px; margin-bottom:8px; border:1px solid #374151;'>
+                    f"""<div style='background:{metric_bg}; padding:12px 18px; border-radius:10px; margin-bottom:8px; border:1px solid {card_border};'>
                     <b>{row['Partita']}</b> &nbsp;|&nbsp; Data: <code>{row['Data']}</code> &nbsp;|&nbsp; Pronostico: <span style='color:#38bdf8;'><b>{row['Selezione']}</b></span> 
                     &nbsp;|&nbsp; Quota: <b>{row['Quota_Book']}</b> &nbsp;|&nbsp; Prob. Modello: <code>{row['Prob_Modello']}%</code> &nbsp;|&nbsp; Edge: <span style='color:#10b981;'><b>+{row['Edge']}%</b></span>
                     </div>""",

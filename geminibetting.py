@@ -45,7 +45,7 @@ else:
     radio_bg = "#e2e8f0"
     radio_text = "#0f172a"
 
-# Iniezione Stile CSS Dinamico
+# Iniezione Stile CSS Dinamico (Parentesi graffe CSS raddoppiate per le f-string)
 st.markdown(
     f"""
     <style>
@@ -60,10 +60,10 @@ st.markdown(
         margin-bottom: 14px; 
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
         transition: transform 0.2s ease;
-    }
+    }}
     .match-card:hover {{
         border-color: #38bdf8;
-    }
+    }}
     
     /* Container di analisi dettagliata */
     .analysis-container {{ 
@@ -73,7 +73,7 @@ st.markdown(
         border: 1px solid {card_border}; 
         margin-top: 25px; 
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1); 
-    }
+    }}
     
     /* Box metriche */
     .metric-box {{ 
@@ -83,7 +83,7 @@ st.markdown(
         border: 1px solid {metric_border}; 
         text-align: center; 
         box-shadow: inset 0 2px 4px rgba(255,255,255,0.02);
-    }
+    }}
     
     /* Box esito Value Bet */
     .value-box {{ 
@@ -94,7 +94,7 @@ st.markdown(
         margin-top: 20px; 
         color: #ecfdf5; 
         box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
-    }
+    }}
     .no-value-box {{ 
         background: linear-gradient(135deg, #7f1d1d 0%, #450a0a 100%); 
         border-left: 6px solid #ef4444; 
@@ -103,7 +103,7 @@ st.markdown(
         margin-top: 20px; 
         color: #fef2f2; 
         box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
-    }
+    }}
     
     /* Radio button personalizzati */
     div.row-widget.stRadio div[role="radiogroup"] label p {{
@@ -117,7 +117,7 @@ st.markdown(
         border-radius: 8px;
         border: 1px solid {card_border};
         margin-right: 8px;
-    }
+    }}
     </style>
 """,
     unsafe_allow_html=True,

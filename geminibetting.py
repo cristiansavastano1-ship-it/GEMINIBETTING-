@@ -16,7 +16,6 @@ st.set_page_config(
 # --- GESTIONE DINAMICA TEMA (DARK / LIGHT MODE) ---
 st.sidebar.markdown("### ⚙️ Pannello di Controllo", unsafe_allow_html=True)
 
-# Selettore Tema nella Sidebar
 tema_selezionato = st.sidebar.radio(
     "🎨 Tema Grafico", ["🌙 Dark Mode", "☀️ Light Mode"], horizontal=True
 )
@@ -52,7 +51,6 @@ st.markdown(
     <style>
     .stApp {{ background-color: {bg_app}; color: {text_app}; }}
     
-    /* Card delle partite */
     .match-card {{ 
         background: {card_bg}; 
         padding: 20px; 
@@ -66,7 +64,6 @@ st.markdown(
         border-color: #38bdf8;
     }}
     
-    /* Container di analisi dettagliata */
     .analysis-container {{ 
         background-color: {analysis_bg}; 
         padding: 30px; 
@@ -76,7 +73,6 @@ st.markdown(
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1); 
     }}
     
-    /* Box metriche */
     .metric-box {{ 
         background: {metric_bg}; 
         padding: 18px; 
@@ -86,7 +82,6 @@ st.markdown(
         box-shadow: inset 0 2px 4px rgba(255,255,255,0.02);
     }}
     
-    /* Box esito Value Bet */
     .value-box {{ 
         background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); 
         border-left: 6px solid #10b981; 
@@ -106,7 +101,6 @@ st.markdown(
         box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
     }}
     
-    /* Radio button personalizzati */
     div.row-widget.stRadio div[role="radiogroup"] label p {{
         color: {radio_text} !important;
         font-weight: 600 !important;
@@ -153,7 +147,6 @@ campionato_scelto = st.sidebar.selectbox(
 )
 codice_lega = LEAGUES[campionato_scelto]
 
-# Tab di navigazione principali (Aggiunto il Tab Monte Carlo)
 tab_calendario, tab_classifica, tab_value, tab_grafici, tab_ai_schedine, tab_value_finder, tab_monte_carlo = st.tabs([
     "📅 Calendario & Studio Match",
     "🏆 Classifica & Export",
@@ -306,7 +299,6 @@ with tab_calendario:
     else:
         st.info("👈 Inserisci la tua API Key gratuita nella barra laterale per sbloccare i calendari.")
 
-    # STUDIO DETTAGLIATO CON MODELLO DI POISSON
     if "match_attivo" in st.session_state:
         m = st.session_state["match_attivo"]
         sq_casa = m["casa"]
@@ -716,19 +708,19 @@ with tab_value_finder:
     else:
         st.info("⚠️ Carica i dati tramite l'API Key nella barra laterale per avviare lo scanner automatico delle value bet.")
 
-# --- TAB 7: SIMULATORE MONTE CARLO & PLAYER IMPACT ---
+# --- TAB 7: SIMULATORE MONTE CARLO & PLAYER IMPACT (AGGIORNATO CON ANGOLI E TIRI IN PORTA) ---
 with tab_monte_carlo:
-    st.subheader("🎲 Simulatore Stocastico Monte Carlo & Player Impact")
-    st.markdown("Esegui migliaia di simulazioni virtuali del match selezionando le squadre e applicando correttivi tattici o di assenza singoli calciatori.")
+    st.subheader("🎲 Simulatore Stocastico Monte Carlo, Player Impact & Match Flow (Angoli & Tiri)")
+    st.markdown("Esegui migliaia di simulazioni virtuali del match proiettando non solo i gol, ma anche i tiri in porta e i calci d'angolo.")
 
     if statistiche_squadre:
         nomi_squadre = sorted(list(statistiche_squadre.keys()))
         
         col_mc1, col_mc2 = st.columns(2)
         with col_mc1:
-            sq_c_sim = st.selectbox("🏠 Squadra di Casa", nomi_squadre, index=0)
+            sq_c_sim = st.selectbox("🏠 Squadra di Casa", nomi_squadre, index=0, key="sim_casa")
         with col_mc2:
-            sq_t_sim = st.selectbox("✈️ Squadra Ospite", nomi_squadre, index=min(1, len(nomi_squadre)-1))
+            sq_t_sim = st.selectbox("✈️ Squadra Ospite", nomi_squadre, index=min(1, len(nomi_squadre)-1), key="sim_trasf")
 
         st.markdown("---")
         st.markdown("##### ⚙️ Parametri Avanzati di Simulazione & Fattori di Impatto")
@@ -737,24 +729,38 @@ with tab_monte_carlo:
         with col_p1:
             num_iterazioni = st.selectbox("Numero di Simulazioni", [1000, 5000, 10000], index=1)
         with col_p2:
-            impatto_assenza_casa = st.slider(f"Modificatore Offensivo {sq_c_sim}", -30, 30, 0, 5, format="%d%%")
+            impatto_assenza_casa = st.slider(f"Modificatore Offensivo {sq_c_sim}", -30, 30, 0, 5, format="%d%%", key="imp_c")
         with col_p3:
-            impatto_assenza_trasf = st.slider(f"Modificatore Offensivo {sq_t_sim}", -30, 30, 0, 5, format="%d%%")
+            impatto_assenza_trasf = st.slider(f"Modificatore Offensivo {sq_t_sim}", -30, 30, 0, 5, format="%d%%", key="imp_t")
 
-        if st.button("🚀 Avvia Simulazione Monte Carlo"):
+        if st.button("🚀 Avvia Simulazione Monte Carlo Avanzata"):
             lam_base_c = statistiche_squadre[sq_c_sim]["media_gf"]
             lam_base_t = statistiche_squadre[sq_t_sim]["media_gf"]
 
-            # Applica i modificatori di impatto calciatori / assenze
+            # Modificatore offensivo per i gol
             lam_effettiva_c = max(0.1, lam_base_c * (1 + impatto_assenza_casa / 100.0))
             lam_effettiva_t = max(0.1, lam_base_t * (1 + impatto_assenza_trasf / 100.0))
 
-            # Esecuzione simulazione Monte Carlo con NumPy
+            # Stima di base per Corner e Tiri in Porta correlati a xG e forza squadra
+            # In media, una squadra di Serie A / top lega fa ~4-6 tiri in porta e ~4-5 corner a match
+            tiri_base_c = max(2.5, lam_effettiva_c * 3.2)
+            tiri_base_t = max(2.0, lam_effettiva_t * 3.0)
+
+            corner_base_c = max(3.0, 4.2 + (lam_effettiva_c - 1.2) * 1.5)
+            corner_base_t = max(2.5, 3.8 + (lam_effettiva_t - 1.1) * 1.4)
+
+            # Esecuzione simulazione Monte Carlo con NumPy (Gol, Tiri, Corner)
             np.random.seed(42)
             gol_casa_sim = np.random.poisson(lam_effettiva_c, num_iterazioni)
             gol_trasf_sim = np.random.poisson(lam_effettiva_t, num_iterazioni)
 
-            # Calcolo metriche derivate
+            tiri_casa_sim = np.random.poisson(tiri_base_c, num_iterazioni)
+            tiri_trasf_sim = np.random.poisson(tiri_base_t, num_iterazioni)
+
+            corner_casa_sim = np.random.poisson(corner_base_c, num_iterazioni)
+            corner_trasf_sim = np.random.poisson(corner_base_t, num_iterazioni)
+
+            # Metriche 1X2
             vittorie_casa = np.sum(gol_casa_sim > gol_trasf_sim)
             pareggi = np.sum(gol_casa_sim == gol_trasf_sim)
             vittorie_trasf = np.sum(gol_casa_sim < gol_trasf_sim)
@@ -764,17 +770,15 @@ with tab_monte_carlo:
             prob_t = (vittorie_trasf / num_iterazioni) * 100
 
             st.markdown("---")
-            st.markdown(f"### 📊 Risultati Simulazione ({num_iterazioni:,} iterazioni virtuali)")
+            st.markdown(f"### 📊 Risultati Simulazione Gol ({num_iterazioni:,} iterazioni virtuali)")
 
             mc1, mc2, mc3 = st.columns(3)
             mc1.metric(f"Vittoria {sq_c_sim} (1)", f"{prob_c:.1f}%")
             mc2.metric("Pareggio (X)", f"{prob_p:.1f}%")
             mc3.metric(f"Vittoria {sq_t_sim} (2)", f"{prob_t:.1f}%")
 
-            # Creazione Heatmap Risultati Esatti
+            # Heatmap Risultati Esatti
             st.markdown("##### 🌡️ Matrice di Calore dei Risultati Esatti più Frequenti")
-            
-            # Matrice 5x5 per i gol (da 0 a 4)
             matrice_risultati = np.zeros((5, 5))
             for gc, gt in zip(gol_casa_sim, gol_trasf_sim):
                 if gc <= 4 and gt <= 4:
@@ -791,17 +795,65 @@ with tab_monte_carlo:
                 color_continuous_scale="Teal",
                 template=plotly_template
             )
-            fig_heatmap.update_layout(height=450, margin=dict(l=10, r=10, t=10, b=10))
+            fig_heatmap.update_layout(height=430, margin=dict(l=10, r=10, t=10, b=10))
             st.plotly_chart(fig_heatmap, use_container_width=True)
 
-            # Box di sintesi e Explainable AI
+            # --- NUOVA SEZIONE: TIRI IN PORTA E CALCI D'ANGOLO ---
+            st.markdown("---")
+            st.markdown("### 🎯 Analisi Avanzata Flusso Match: Tiri in Porta & Calci d'Angolo")
+
+            media_tiri_c = np.mean(tiri_casa_sim)
+            media_tiri_t = np.mean(tiri_trasf_sim)
+            tot_tiri_match = media_tiri_c + media_tiri_t
+
+            media_corner_c = np.mean(corner_casa_sim)
+            media_corner_t = np.mean(corner_trasf_sim)
+            tot_corner_match = media_corner_c + media_corner_t
+
+            prob_over_95_c = (np.sum((corner_casa_sim + corner_trasf_sim) > 9.5) / num_iterazioni) * 100
+            prob_tiri_c_45 = (np.sum(tiri_casa_sim >= 4.5) / num_iterzioni if 'num_iterzioni' in locals() else np.sum(tiri_casa_sim >= 4.5) / num_iterazioni) * 100
+
+            col_flow1, col_flow2 = st.columns(2)
+
+            with col_flow1:
+                st.markdown(
+                    f"""
+                    <div class="metric-box" style="text-align: left; padding: 20px;">
+                        <h4 style="color: #38bdf8; margin-top:0;">🚩 Calci d'Angolo (Corners)</h4>
+                        <p><b>{sq_c_sim}:</b> {media_corner_c:.1f} medi</p>
+                        <p><b>{sq_t_sim}:</b> {media_corner_t:.1f} medi</p>
+                        <hr style="border-color: {card_border};">
+                        <p><b>Totale Angoli Stimati Match:</b> <span style="color:#10b981; font-size:18px;">{tot_corner_match:.1f}</span></p>
+                        <p style="font-size: 13px; color: {text_muted};">Probabilità Over 9.5 Corner Totali: <b>{prob_over_95_c:.1f}%</b></p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+            with col_flow2:
+                st.markdown(
+                    f"""
+                    <div class="metric-box" style="text-align: left; padding: 20px;">
+                        <h4 style="color: #38bdf8; margin-top:0;">🎯 Tiri in Porta (Shots on Target)</h4>
+                        <p><b>{sq_c_sim}:</b> {media_tiri_c:.1f} tiri</p>
+                        <p><b>{sq_t_sim}:</b> {media_tiri_t:.1f} tiri</p>
+                        <hr style="border-color: {card_border};">
+                        <p><b>Totale Tiri in Porta Match:</b> <span style="color:#10b981; font-size:18px;">{tot_tiri_match:.1f}</span></p>
+                        <p style="font-size: 13px; color: {text_muted};">Prob. {sq_c_sim} Over 4.5 Tiri in Porta: <b>{prob_tiri_c_45:.1f}%</b></p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+            # Box di sintesi finale
             st.markdown(
                 f"""
                 <div class="analysis-container">
-                    <h4>💡 Insight di Sintesi dell'IA</h4>
+                    <h4>💡 Insight di Sintesi dell'IA (Monte Carlo Globale)</h4>
                     <ul>
                         <li><b>Aspettativa Gol Corretta ({sq_c_sim}):</b> {lam_effettiva_c:.2f} (Base: {lam_base_c:.2f})</li>
                         <li><b>Aspettativa Gol Corretta ({sq_t_sim}):</b> {lam_effettiva_t:.2f} (Base: {lam_base_t:.2f})</li>
+                        <li><b>Volume Offensivo Stimato:</b> Circa <b>{tot_tiri_match:.1f} tiri nello specchio</b> e <b>{tot_corner_match:.1f} calci d'angolo</b> complessivi nel match.</li>
                         <li><b>Indice di Volatilità del Match:</b> {'Basso (Incontro stabile)' if abs(prob_c - prob_t) > 25 else 'Alto (Match imprevedibile e aperto)'}</li>
                     </ul>
                 </div>

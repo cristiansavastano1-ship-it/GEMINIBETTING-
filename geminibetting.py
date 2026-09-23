@@ -11,12 +11,13 @@ st.set_page_config(
     page_icon="⚽",
 )
 
-# Stile CSS avanzato
+# Stile CSS avanzato, moderno e curato nei dettagli
 st.markdown(
     """
     <style>
     .stApp { background-color: #0b0f19; color: #f8fafc; }
     
+    /* Card delle partite */
     .match-card { 
         background: linear-gradient(135deg, #111827 0%, #1f2937 100%); 
         padding: 20px; 
@@ -26,8 +27,11 @@ st.markdown(
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
         transition: transform 0.2s ease;
     }
-    .match-card:hover { border-color: #38bdf8; }
+    .match-card:hover {
+        border-color: #38bdf8;
+    }
     
+    /* Container di analisi dettagliata */
     .analysis-container { 
         background-color: #111827; 
         padding: 30px; 
@@ -37,6 +41,7 @@ st.markdown(
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); 
     }
     
+    /* Box metriche */
     .metric-box { 
         background: #1f2937; 
         padding: 18px; 
@@ -46,6 +51,7 @@ st.markdown(
         box-shadow: inset 0 2px 4px rgba(255,255,255,0.05);
     }
     
+    /* Box esito Value Bet */
     .value-box { 
         background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); 
         border-left: 6px solid #10b981; 
@@ -53,6 +59,7 @@ st.markdown(
         border-radius: 12px; 
         margin-top: 20px; 
         color: #ecfdf5; 
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
     }
     .no-value-box { 
         background: linear-gradient(135deg, #7f1d1d 0%, #450a0a 100%); 
@@ -61,8 +68,10 @@ st.markdown(
         border-radius: 12px; 
         margin-top: 20px; 
         color: #fef2f2; 
+        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
     }
     
+    /* Radio button personalizzati */
     div.row-widget.stRadio div[role="radiogroup"] label p {
         color: #ffffff !important;
         font-weight: 600 !important;
@@ -80,12 +89,13 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# Header principale con stile pulito
 st.markdown(
     "<h1 style='text-align: center; color: #f8fafc; font-weight: 800;'>⚽ PRO BETTING STUDIO & ANALYTICS</h1>",
     unsafe_allow_html=True,
 )
 st.markdown(
-    "<p style='text-align: center; color: #94a3b8; font-size: 16px; margin-bottom: 30px;'>Piattaforma professionale con Poisson, Fattore Campo, Clean Sheet e H2H.</p>",
+    "<p style='text-align: center; color: #94a3b8; font-size: 16px; margin-bottom: 30px;'>Piattaforma professionale di analisi statistica calcistica basata su Poisson, xG e Value Betting.</p>",
     unsafe_allow_html=True,
 )
 
@@ -99,6 +109,7 @@ LEAGUES = {
     "Champions League": "CL",
 }
 
+# Sidebar migliorata
 st.sidebar.markdown(
     "### ⚙️ Pannello di Controllo", unsafe_allow_html=True
 )
@@ -111,6 +122,7 @@ campionato_scelto = st.sidebar.selectbox(
 )
 codice_lega = LEAGUES[campionato_scelto]
 
+# Tab di navigazione principali
 tab_calendario, tab_classifica, tab_value, tab_grafici = st.tabs([
     "📅 Calendario & Studio Match",
     "🏆 Classifica & Export",
@@ -153,131 +165,23 @@ def poisson_prob(lmbda, k):
     return (math.exp(-lmbda) * (lmbda**k)) / math.factorial(k)
 
 
-# Funzione avanzata per calcolare statistiche dettagliate (Fattore Campo, Clean Sheet, Fail to Score)
-def calcola_statistiche_avanzate(matches_list, nome_squadra):
-    giocate_casa = 0
-    gol_fatti_casa = 0
-    gol_subiti_casa = 0
-    clean_sheet_casa = 0
-    fail_to_score_casa = 0
-
-    giocate_trasf = 0
-    gol_fatti_trasf = 0
-    gol_subiti_trasf = 0
-    clean_sheet_trasf = 0
-    fail_to_score_trasf = 0
-
-    partite_squadra_tot = []
-
+def calcola_forma_recente(matches_list, nome_squadra):
+    partite_squadra = []
     for m in matches_list:
         if m["status"] == "FINISHED":
             h = m["homeTeam"]["name"]
             a = m["awayTeam"]["name"]
-            gh = m["score"]["fullTime"].get("home", 0)
-            ga = m["score"]["fullTime"].get("away", 0)
-
-            if gh is not None and ga is not None:
-                # Tracciamento forma recente
-                if h == nome_squadra or a == nome_squadra:
-                    res = (
-                        "V"
-                        if (h == nome_squadra and gh > ga)
-                        or (a == nome_squadra and ga > gh)
-                        else ("P" if gh == ga else "S")
-                    )
-                    partite_squadra_tot.append(res)
-
-                # Statistiche Casa
-                if h == nome_squadra:
-                    giocate_casa += 1
-                    gol_fatti_casa += gh
-                    gol_subiti_casa += ga
-                    if ga == 0:
-                        clean_sheet_casa += 1
-                    if gh == 0:
-                        fail_to_score_casa += 1
-
-                # Statistiche Trasferta
-                if a == nome_squadra:
-                    giocate_trasf += 1
-                    gol_fatti_trasf += ga
-                    gol_subiti_trasf += gh
-                    if gh == 0:
-                        clean_sheet_trasf += 1
-                    if ga == 0:
-                        fail_to_score_trasf += 1
-
-    # Medie
-    med_gf_c = gol_fatti_casa / max(giocate_casa, 1)
-    med_gs_c = gol_subiti_casa / max(giocate_casa, 1)
-    cs_c_pct = (
-        round((clean_sheet_casa / giocate_casa) * 100, 1)
-        if giocate_casa > 0
-        else 0
-    )
-    fts_c_pct = (
-        round((fail_to_score_casa / giocate_casa) * 100, 1)
-        if giocate_casa > 0
-        else 0
-    )
-
-    med_gf_t = gol_fatti_trasf / max(giocate_trasf, 1)
-    med_gs_t = gol_subiti_trasf / max(giocate_trasf, 1)
-    cs_t_pct = (
-        round((clean_sheet_trasf / giocate_trasf) * 100, 1)
-        if giocate_trasf > 0
-        else 0
-    )
-    fts_t_pct = (
-        round((fail_to_score_trasf / giocate_trasf) * 100, 1)
-        if giocate_trasf > 0
-        else 0
-    )
-
-    ultime = (
-        "".join(partite_squadra_tot[-5:])
-        if len(partite_squadra_tot) >= 5
-        else "".join(partite_squadra_tot)
-    )
-
-    return {
-        "casa": {
-            "media_gf": med_gf_c,
-            "media_gs": med_gs_c,
-            "cs_pct": cs_c_pct,
-            "fts_pct": fts_c_pct,
-            "giocate": giocate_casa,
-        },
-        "trasferta": {
-            "media_gf": med_gf_t,
-            "media_gs": med_gs_t,
-            "cs_pct": cs_t_pct,
-            "fts_pct": fts_t_pct,
-            "giocate": giocate_trasf,
-        },
-        "forma": ultime if ultime else "N/D",
-    }
-
-
-# Funzione per estrarre lo storico H2H (Testa a Testa)
-def estrai_h2h(matches_list, sq_casa, sq_trasf):
-    precedenti = []
-    for m in matches_list:
-        if m["status"] == "FINISHED":
-            h = m["homeTeam"]["name"]
-            a = m["awayTeam"]["name"]
-            if (h == sq_casa and a == sq_trasf) or (
-                h == sq_trasf and a == sq_casa
-            ):
-                gh = m["score"]["fullTime"].get("home", "-")
-                ga = m["score"]["fullTime"].get("away", "-")
-                precedenti.append({
-                    "data": m["utcDate"][:10],
-                    "casa": h,
-                    "trasferta": a,
-                    "risultato": f"{gh} - {ga}",
-                })
-    return precedenti[:5]  # Ultimi 5 precedenti
+            if h == nome_squadra or a == nome_squadra:
+                gh = m["score"]["fullTime"].get("home", 0)
+                ga = m["score"]["fullTime"].get("away", 0)
+                if gh is not None and ga is not None:
+                    if h == nome_squadra:
+                        res = "V" if gh > ga else ("P" if gh == ga else "S")
+                    else:
+                        res = "V" if ga > gh else ("P" if ga == gh else "S")
+                    partite_squadra.append(res)
+    ultime = partite_squadra[-5:] if len(partite_squadra) >= 5 else partite_squadra
+    return "".join(ultime) if ultime else "N/D"
 
 
 # --- TAB 1: CALENDARIO E STUDIO STATISTICO ---
@@ -287,18 +191,27 @@ with tab_calendario:
 
     if api_key:
         dati = scarica_dati(api_key, codice_lega)
+        dati_classifica = scarica_classifica(api_key, codice_lega)
+
         if dati and "matches" in dati:
             matches_raw = dati["matches"]
-            # Prepara le statistiche avanzate per ogni squadra trovata nel campionato
-            squadre_uniche = set()
-            for m in matches_raw:
-                squadre_uniche.add(m["homeTeam"]["name"])
-                squadre_uniche.add(m["awayTeam"]["name"])
 
-            for sq in squadre_uniche:
-                statistiche_squadre[sq] = calcola_statistiche_avanzate(
-                    matches_raw, sq
-                )
+        if dati_classifica and "standings" in dati_classifica:
+            for s in dati_classifica["standings"]:
+                if s["type"] == "TOTAL":
+                    for riga in s["table"]:
+                        nome_sq = riga["team"]["name"]
+                        giocate = max(riga["playedGames"], 1)
+                        gf = riga["goalsFor"]
+                        gs = riga["goalsAgainst"]
+                        statistiche_squadre[nome_sq] = {
+                            "media_gf": gf / giocate,
+                            "media_gs": gs / giocate,
+                            "punti": riga["points"],
+                            "forma": calcola_forma_recente(
+                                matches_raw, nome_sq
+                            ),
+                        }
 
         if matches_raw:
             lista = []
@@ -340,6 +253,7 @@ with tab_calendario:
                 st.markdown("<br>", unsafe_allow_html=True)
 
                 partite_filtrate = df[df["giornata"] == giornata_sel]
+
                 st.markdown(
                     f"### 📌 Match in Programma - Giornata {int(giornata_sel)}"
                 )
@@ -363,7 +277,7 @@ with tab_calendario:
                         with c3:
                             st.markdown("<br>", unsafe_allow_html=True)
                             if st.button(
-                                "📊 Studio Avanzato", key=f"btn_match_{idx}"
+                                "📊 Studio Poisson", key=f"btn_match_{idx}"
                             ):
                                 st.session_state["match_attivo"] = row
                         st.markdown("</div>", unsafe_allow_html=True)
@@ -376,31 +290,21 @@ with tab_calendario:
             "👈 Inserisci la tua API Key gratuita nella barra laterale per sbloccare i calendari."
         )
 
-    # STUDIO DETTAGLIATO CON FATTORE CAMPO, CLEAN SHEET E H2H
+    # STUDIO DETTAGLIATO CON MODELLO DI POISSON
     if "match_attivo" in st.session_state:
         m = st.session_state["match_attivo"]
         sq_casa = m["casa"]
         sq_trasf = m["trasferta"]
 
         if sq_casa in statistiche_squadre and sq_trasf in statistiche_squadre:
-            # Sfruttiamo le performance reali in base al fattore campo!
-            lam_c = statistiche_squadre[sq_casa]["casa"]["media_gf"]
-            lam_t = statistiche_squadre[sq_trasf]["trasferta"]["media_gf"]
-
-            cs_casa = statistiche_squadre[sq_casa]["casa"]["cs_pct"]
-            fts_casa = statistiche_squadre[sq_casa]["casa"]["fts_pct"]
-
-            cs_trasf = statistiche_squadre[sq_trasf]["trasferta"]["cs_pct"]
-            fts_trasf = statistiche_squadre[sq_trasf]["trasferta"]["fts_pct"]
-
+            lam_c = statistiche_squadre[sq_casa]["media_gf"]
+            lam_t = statistiche_squadre[sq_trasf]["media_gf"]
             forma_casa = statistiche_squadre[sq_casa]["forma"]
             forma_trasf = statistiche_squadre[sq_trasf]["forma"]
         else:
             lam_c, lam_t = 1.4, 1.1
-            cs_casa, fts_casa, cs_trasf, fts_trasf = 30, 20, 25, 30
             forma_casa, forma_trasf = "N/D", "N/D"
 
-        # Modello Poisson basato sul fattore campo
         max_gol = 5
         p_casa, p_pareggio, p_trasferta = 0.0, 0.0, 0.0
 
@@ -418,6 +322,7 @@ with tab_calendario:
         p_c_1x2 = round((p_casa / tot_1x2) * 100, 1)
         p_p_1x2 = round((p_pareggio / tot_1x2) * 100, 1)
         p_t_1x2 = round((p_trasferta / tot_1x2) * 100, 1)
+
         xg_stimati = round(lam_c + lam_t, 2)
 
         risultati_esatti_list = []
@@ -453,41 +358,39 @@ with tab_calendario:
             1,
         )
 
-        h2h_list = estrai_h2h(matches_raw, sq_casa, sq_trasf)
-
         st.markdown('<div class="analysis-container">', unsafe_allow_html=True)
         st.markdown(
-            f"<h2>🔬 Studio Avanzato: {sq_casa} vs {sq_trasf}</h2>",
+            f"<h2>🔬 Analisi Scientifica: {sq_casa} vs {sq_trasf}</h2>",
             unsafe_allow_html=True,
         )
         st.markdown(
-            f"<p style='color: #94a3b8;'>Forma Recente: 🏠 <b>{sq_casa}</b> [{forma_casa}] &nbsp;|&nbsp; ✈️ <b>{sq_trasf}</b> [{forma_trasf}]</p>",
+            f"<p style='color: #94a3b8;'>Forma Recente (Ultime 5): 🏠 <b>{sq_casa}</b> [{forma_casa}] &nbsp;|&nbsp; ✈️ <b>{sq_trasf}</b> [{forma_trasf}]</p>",
             unsafe_allow_html=True,
         )
 
         focus_mercato = st.radio(
             "🎯 Scegli l'Ambito di Analisi",
             [
-                "Panoramica & Fattore Campo",
-                "Clean Sheet & Fail to Score",
-                "1X2 & Risultati Esatti",
-                "Precedenti (H2H)",
+                "Panoramica Poisson",
+                "1X2 & Doppia Chance",
+                "Gol / No Gol & Over/Under",
+                "Risultati Esatti",
             ],
             horizontal=True,
         )
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        if focus_mercato == "Panoramica & Fattore Campo":
+        if focus_mercato == "Panoramica Poisson":
             col1, col2, col3, col4 = st.columns(4)
             with col1:
                 st.markdown(
-                    f'<div class="metric-box"><b>xG Casa (In Casa)</b><br><span style="font-size:24px; color:#38bdf8;">{lam_c:.2f}</span></div>',
+                    f'<div class="metric-box"><b>xG Casa (Lambda)</b><br><span style="font-size:24px; color:#38bdf8;">{lam_c:.2f}</span></div>',
                     unsafe_allow_html=True,
                 )
             with col2:
                 st.markdown(
-                    f'<div class="metric-box"><b>xG Trasf (Fuori)</b><br><span style="font-size:24px; color:#38bdf8;">{lam_t:.2f}</span></div>',
+                    f'<div class="metric-box"><b>xG Trasf (Lambda)</b><br><span style="font-size:24px; color:#38bdf8;">{lam_t:.2f}</span></div>',
                     unsafe_allow_html=True,
                 )
             with col3:
@@ -501,67 +404,61 @@ with tab_calendario:
                     unsafe_allow_html=True,
                 )
 
-        elif focus_mercato == "Clean Sheet & Fail to Score":
+        elif focus_mercato == "1X2 & Doppia Chance":
             col1, col2, col3, col4 = st.columns(4)
             with col1:
                 st.markdown(
-                    f'<div class="metric-box"><b>Clean Sheet ({sq_casa})</b><br><span style="font-size:22px; color:#38bdf8;">{cs_casa}%</span><br><span style="font-size:11px; color:#94a3b8;">partite interne</span></div>',
+                    f'<div class="metric-box"><b>Segno 1</b><br><span style="font-size:22px; color:#38bdf8;">{p_c_1x2}%</span></div>',
                     unsafe_allow_html=True,
                 )
             with col2:
                 st.markdown(
-                    f'<div class="metric-box"><b>Fail to Score ({sq_casa})</b><br><span style="font-size:22px; color:#f87171;">{fts_casa}%</span><br><span style="font-size:11px; color:#94a3b8;">partite interne</span></div>',
+                    f'<div class="metric-box"><b>Segno X</b><br><span style="font-size:22px; color:#38bdf8;">{p_p_1x2}%</span></div>',
                     unsafe_allow_html=True,
                 )
             with col3:
                 st.markdown(
-                    f'<div class="metric-box"><b>Clean Sheet ({sq_trasf})</b><br><span style="font-size:22px; color:#38bdf8;">{cs_trasf}%</span><br><span style="font-size:11px; color:#94a3b8;">partite esterne</span></div>',
+                    f'<div class="metric-box"><b>Segno 2</b><br><span style="font-size:22px; color:#38bdf8;">{p_t_1x2}%</span></div>',
                     unsafe_allow_html=True,
                 )
             with col4:
+                dc = (
+                    "1X"
+                    if p_c_1x2 >= p_t_1x2
+                    else ("X2" if p_t_1x2 > p_c_1x2 else "12")
+                )
                 st.markdown(
-                    f'<div class="metric-box"><b>Fail to Score ({sq_trasf})</b><br><span style="font-size:22px; color:#f87171;">{fts_trasf}%</span><br><span style="font-size:11px; color:#94a3b8;">partite esterne</span></div>',
+                    f'<div class="metric-box"><b>Doppia Chance</b><br><span style="font-size:22px; color:#10b981;">{dc}</span></div>',
                     unsafe_allow_html=True,
                 )
 
-        elif focus_mercato == "1X2 & Risultati Esatti":
+        elif focus_mercato == "Gol / No Gol & Over/Under":
             col1, col2, col3 = st.columns(3)
             with col1:
                 st.markdown(
-                    f'<div class="metric-box"><b>Segno 1</b><br><span style="font-size:20px; color:#38bdf8;">{p_c_1x2}%</span></div>',
+                    f'<div class="metric-box"><b>BTTS (Gol / Gol)</b><br><span style="font-size:22px; color:#38bdf8;">{btts_rate}%</span></div>',
                     unsafe_allow_html=True,
                 )
             with col2:
                 st.markdown(
-                    f'<div class="metric-box"><b>Segno X</b><br><span style="font-size:20px; color:#38bdf8;">{p_p_1x2}%</span></div>',
+                    f'<div class="metric-box"><b>Over 2.5</b><br><span style="font-size:22px; color:#38bdf8;">{over_25_rate}%</span></div>',
                     unsafe_allow_html=True,
                 )
             with col3:
                 st.markdown(
-                    f'<div class="metric-box"><b>Segno 2</b><br><span style="font-size:20px; color:#38bdf8;">{p_t_1x2}%</span></div>',
+                    f'<div class="metric-box"><b>Under 2.5</b><br><span style="font-size:22px; color:#38bdf8;">{round(100 - over_25_rate, 1)}%</span></div>',
                     unsafe_allow_html=True,
                 )
-            st.markdown("<br>##### 🎯 Top Risultati Esatti (Poisson)")
-            r1, r2, r3, r4 = st.columns(4)
+
+        elif focus_mercato == "Risultati Esatti":
+            col1, col2, col3, col4 = st.columns(4)
             for i in range(4):
                 res_str, prob_val = risultati_esatti_list[i]
-                with [r1, r2, r3, r4][i]:
+                with [col1, col2, col3, col4][i]:
                     st.markdown(
-                        f'<div class="metric-box"><b>Top {i+1}</b><br><span style="font-size:18px; color:#10b981;">{res_str}</span><br><span style="font-size:11px; color:#94a3b8;">{prob_val:.1f}%</span></div>',
+                        f'<div class="metric-box"><b>Top {i+1}</b><br><span style="font-size:22px; color:#10b981;">{res_str}</span><br><span style="font-size:12px; color:#94a3b8;">{prob_val:.1f}%</span></div>',
                         unsafe_allow_html=True,
                     )
-
-        elif focus_mercato == "Precedenti (H2H)":
-            st.markdown("##### 📜 Ultimi Precedenti Diretti (H2H)")
-            if h2h_list:
-                for match_h2h in h2h_list:
-                    st.markdown(
-                        f"📅 **{match_h2h['data']}** &nbsp;|&nbsp; {match_h2h['casa']} vs {match_h2h['trasferta']} &nbsp;➔&nbsp; Risultato: **{match_h2h['risultato']}**"
-                    )
-            else:
-                st.info(
-                    "Nessun precedente diretto recente registrato nei dati disponibili di questo campionato."
-                )
 
         st.markdown("</div>", unsafe_allow_html=True)
 

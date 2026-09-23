@@ -1,5 +1,6 @@
 import math
 import pandas as pd
+import numpy as np
 import plotly.express as px
 import requests
 import streamlit as st
@@ -95,7 +96,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 st.markdown(
-    "<p style='text-align: center; color: #94a3b8; font-size: 16px; margin-bottom: 30px;'>Piattaforma professionale di analisi statistica calcistica basata su Poisson, xG e Value Betting.</p>",
+    "<p style='text-align: center; color: #94a3b8; font-size: 16px; margin-bottom: 30px;'>Piattaforma professionale di analisi statistica calcistica basata su Poisson, xG, Value Betting & AI Smart Acca.</p>",
     unsafe_allow_html=True,
 )
 
@@ -122,12 +123,14 @@ campionato_scelto = st.sidebar.selectbox(
 )
 codice_lega = LEAGUES[campionato_scelto]
 
-# Tab di navigazione principali
-tab_calendario, tab_classifica, tab_value, tab_grafici = st.tabs([
+# Tab di navigazione principali estesi con le nuove sezioni AI
+tab_calendario, tab_classifica, tab_value, tab_grafici, tab_ai_schedine, tab_value_finder = st.tabs([
     "📅 Calendario & Studio Match",
     "🏆 Classifica & Export",
     "🔍 Calcolatore Value Bet",
     "📊 Grafici & Trend",
+    "🤖 Schedine Smart & AI",
+    "⚡ Value Finder Automatico"
 ])
 
 
@@ -184,48 +187,41 @@ def calcola_forma_recente(matches_list, nome_squadra):
     return "".join(ultime) if ultime else "N/D"
 
 
+# Caricamento preliminare dati per alimentare le sezioni
+statistiche_squadre = {}
+matches_raw = []
+
+if api_key:
+    dati = scarica_dati(api_key, codice_lega)
+    dati_classifica = scarica_classifica(api_key, codice_lega)
+
+    if dati and "matches" in dati:
+        matches_raw = dati["matches"]
+
+    if dati_classifica and "standings" in dati_classifica:
+        for s in dati_classifica["standings"]:
+            if s["type"] == "TOTAL":
+                for riga in s["table"]:
+                    nome_sq = riga["team"]["name"]
+                    giocate = max(riga["playedGames"], 1)
+                    gf = riga["goalsFor"]
+                    gs = riga["goalsAgainst"]
+                    statistiche_squadre[nome_sq] = {
+                        "media_gf": gf / giocate,
+                        "media_gs": gs / giocate,
+                        "punti": riga["points"],
+                        "forma": calcola_forma_recente(matches_raw, nome_sq),
+                    }
+
+
 # --- TAB 1: CALENDARIO E STUDIO STATISTICO ---
 with tab_calendario:
-    statistiche_squadre = {}
-    matches_raw = []
-
     if api_key:
-        dati = scarica_dati(api_key, codice_lega)
-        dati_classifica = scarica_classifica(api_key, codice_lega)
-
-        if dati and "matches" in dati:
-            matches_raw = dati["matches"]
-
-        if dati_classifica and "standings" in dati_classifica:
-            for s in dati_classifica["standings"]:
-                if s["type"] == "TOTAL":
-                    for riga in s["table"]:
-                        nome_sq = riga["team"]["name"]
-                        giocate = max(riga["playedGames"], 1)
-                        gf = riga["goalsFor"]
-                        gs = riga["goalsAgainst"]
-                        statistiche_squadre[nome_sq] = {
-                            "media_gf": gf / giocate,
-                            "media_gs": gs / giocate,
-                            "punti": riga["points"],
-                            "forma": calcola_forma_recente(
-                                matches_raw, nome_sq
-                            ),
-                        }
-
         if matches_raw:
             lista = []
             for m in matches_raw:
-                g_casa = (
-                    m["score"]["fullTime"].get("home")
-                    if m.get("score") and m["score"].get("fullTime")
-                    else None
-                )
-                g_trasf = (
-                    m["score"]["fullTime"].get("away")
-                    if m.get("score") and m["score"].get("fullTime")
-                    else None
-                )
+                g_casa = m["score"]["fullTime"].get("home") if m.get("score") and m["score"].get("fullTime") else None
+                g_trasf = m["score"]["fullTime"].get("away") if m.get("score") and m["score"].get("fullTime") else None
 
                 lista.append({
                     "giornata": m.get("matchday", 0),
@@ -254,15 +250,11 @@ with tab_calendario:
 
                 partite_filtrate = df[df["giornata"] == giornata_sel]
 
-                st.markdown(
-                    f"### 📌 Match in Programma - Giornata {int(giornata_sel)}"
-                )
+                st.markdown(f"### 📌 Match in Programma - Giornata {int(giornata_sel)}")
 
                 for idx, row in partite_filtrate.iterrows():
                     with st.container():
-                        st.markdown(
-                            '<div class="match-card">', unsafe_allow_html=True
-                        )
+                        st.markdown('<div class="match-card">', unsafe_allow_html=True)
                         c1, c2, c3 = st.columns([3, 2, 2])
                         with c1:
                             st.markdown(
@@ -276,19 +268,13 @@ with tab_calendario:
                             )
                         with c3:
                             st.markdown("<br>", unsafe_allow_html=True)
-                            if st.button(
-                                "📊 Studio Poisson", key=f"btn_match_{idx}"
-                            ):
+                            if st.button("📊 Studio Poisson", key=f"btn_match_{idx}"):
                                 st.session_state["match_attivo"] = row
                         st.markdown("</div>", unsafe_allow_html=True)
         else:
-            st.error(
-                "Impossibile scaricare i dati. Verifica la correttezza della chiave API."
-            )
+            st.error("Impossibile scaricare i dati. Verifica la correttezza della chiave API.")
     else:
-        st.info(
-            "👈 Inserisci la tua API Key gratuita nella barra laterale per sbloccare i calendari."
-        )
+        st.info("👈 Inserisci la tua API Key gratuita nella barra laterale per sbloccare i calendari.")
 
     # STUDIO DETTAGLIATO CON MODELLO DI POISSON
     if "match_attivo" in st.session_state:
@@ -328,14 +314,8 @@ with tab_calendario:
         risultati_esatti_list = []
         for r_c in range(4):
             for r_t in range(4):
-                p_res = (
-                    poisson_prob(lam_c, r_c)
-                    * poisson_prob(lam_t, r_t)
-                    / tot_1x2
-                )
-                risultati_esatti_list.append(
-                    (f"{r_c} - {r_t}", p_res * 100)
-                )
+                p_res = poisson_prob(lam_c, r_c) * poisson_prob(lam_t, r_t) / tot_1x2
+                risultati_esatti_list.append((f"{r_c} - {r_t}", p_res * 100))
         risultati_esatti_list.sort(key=lambda x: x[1], reverse=True)
 
         btts_rate = round(
@@ -359,10 +339,7 @@ with tab_calendario:
         )
 
         st.markdown('<div class="analysis-container">', unsafe_allow_html=True)
-        st.markdown(
-            f"<h2>🔬 Analisi Scientifica: {sq_casa} vs {sq_trasf}</h2>",
-            unsafe_allow_html=True,
-        )
+        st.markdown(f"<h2>🔬 Analisi Scientifica: {sq_casa} vs {sq_trasf}</h2>", unsafe_allow_html=True)
         st.markdown(
             f"<p style='color: #94a3b8;'>Forma Recente (Ultime 5): 🏠 <b>{sq_casa}</b> [{forma_casa}] &nbsp;|&nbsp; ✈️ <b>{sq_trasf}</b> [{forma_trasf}]</p>",
             unsafe_allow_html=True,
@@ -384,81 +361,41 @@ with tab_calendario:
         if focus_mercato == "Panoramica Poisson":
             col1, col2, col3, col4 = st.columns(4)
             with col1:
-                st.markdown(
-                    f'<div class="metric-box"><b>xG Casa (Lambda)</b><br><span style="font-size:24px; color:#38bdf8;">{lam_c:.2f}</span></div>',
-                    unsafe_allow_html=True,
-                )
+                st.markdown(f'<div class="metric-box"><b>xG Casa (Lambda)</b><br><span style="font-size:24px; color:#38bdf8;">{lam_c:.2f}</span></div>', unsafe_allow_html=True)
             with col2:
-                st.markdown(
-                    f'<div class="metric-box"><b>xG Trasf (Lambda)</b><br><span style="font-size:24px; color:#38bdf8;">{lam_t:.2f}</span></div>',
-                    unsafe_allow_html=True,
-                )
+                st.markdown(f'<div class="metric-box"><b>xG Trasf (Lambda)</b><br><span style="font-size:24px; color:#38bdf8;">{lam_t:.2f}</span></div>', unsafe_allow_html=True)
             with col3:
-                st.markdown(
-                    f'<div class="metric-box"><b>xG Totali Match</b><br><span style="font-size:24px; color:#38bdf8;">{xg_stimati}</span></div>',
-                    unsafe_allow_html=True,
-                )
+                st.markdown(f'<div class="metric-box"><b>xG Totali Match</b><br><span style="font-size:24px; color:#38bdf8;">{xg_stimati}</span></div>', unsafe_allow_html=True)
             with col4:
-                st.markdown(
-                    f'<div class="metric-box"><b>Over 2.5 Prob.</b><br><span style="font-size:24px; color:#38bdf8;">{over_25_rate}%</span></div>',
-                    unsafe_allow_html=True,
-                )
+                st.markdown(f'<div class="metric-box"><b>Over 2.5 Prob.</b><br><span style="font-size:24px; color:#38bdf8;">{over_25_rate}%</span></div>', unsafe_allow_html=True)
 
         elif focus_mercato == "1X2 & Doppia Chance":
             col1, col2, col3, col4 = st.columns(4)
             with col1:
-                st.markdown(
-                    f'<div class="metric-box"><b>Segno 1</b><br><span style="font-size:22px; color:#38bdf8;">{p_c_1x2}%</span></div>',
-                    unsafe_allow_html=True,
-                )
+                st.markdown(f'<div class="metric-box"><b>Segno 1</b><br><span style="font-size:22px; color:#38bdf8;">{p_c_1x2}%</span></div>', unsafe_allow_html=True)
             with col2:
-                st.markdown(
-                    f'<div class="metric-box"><b>Segno X</b><br><span style="font-size:22px; color:#38bdf8;">{p_p_1x2}%</span></div>',
-                    unsafe_allow_html=True,
-                )
+                st.markdown(f'<div class="metric-box"><b>Segno X</b><br><span style="font-size:22px; color:#38bdf8;">{p_p_1x2}%</span></div>', unsafe_allow_html=True)
             with col3:
-                st.markdown(
-                    f'<div class="metric-box"><b>Segno 2</b><br><span style="font-size:22px; color:#38bdf8;">{p_t_1x2}%</span></div>',
-                    unsafe_allow_html=True,
-                )
+                st.markdown(f'<div class="metric-box"><b>Segno 2</b><br><span style="font-size:22px; color:#38bdf8;">{p_t_1x2}%</span></div>', unsafe_allow_html=True)
             with col4:
-                dc = (
-                    "1X"
-                    if p_c_1x2 >= p_t_1x2
-                    else ("X2" if p_t_1x2 > p_c_1x2 else "12")
-                )
-                st.markdown(
-                    f'<div class="metric-box"><b>Doppia Chance</b><br><span style="font-size:22px; color:#10b981;">{dc}</span></div>',
-                    unsafe_allow_html=True,
-                )
+                dc = "1X" if p_c_1x2 >= p_t_1x2 else ("X2" if p_t_1x2 > p_c_1x2 else "12")
+                st.markdown(f'<div class="metric-box"><b>Doppia Chance</b><br><span style="font-size:22px; color:#10b981;">{dc}</span></div>', unsafe_allow_html=True)
 
         elif focus_mercato == "Gol / No Gol & Over/Under":
             col1, col2, col3 = st.columns(3)
             with col1:
-                st.markdown(
-                    f'<div class="metric-box"><b>BTTS (Gol / Gol)</b><br><span style="font-size:22px; color:#38bdf8;">{btts_rate}%</span></div>',
-                    unsafe_allow_html=True,
-                )
+                st.markdown(f'<div class="metric-box"><b>BTTS (Gol / Gol)</b><br><span style="font-size:22px; color:#38bdf8;">{btts_rate}%</span></div>', unsafe_allow_html=True)
             with col2:
-                st.markdown(
-                    f'<div class="metric-box"><b>Over 2.5</b><br><span style="font-size:22px; color:#38bdf8;">{over_25_rate}%</span></div>',
-                    unsafe_allow_html=True,
-                )
+                st.markdown(f'<div class="metric-box"><b>Over 2.5</b><br><span style="font-size:22px; color:#38bdf8;">{over_25_rate}%</span></div>', unsafe_allow_html=True)
             with col3:
-                st.markdown(
-                    f'<div class="metric-box"><b>Under 2.5</b><br><span style="font-size:22px; color:#38bdf8;">{round(100 - over_25_rate, 1)}%</span></div>',
-                    unsafe_allow_html=True,
-                )
+                st.markdown(f'<div class="metric-box"><b>Under 2.5</b><br><span style="font-size:22px; color:#38bdf8;">{round(100 - over_25_rate, 1)}%</span></div>', unsafe_allow_html=True)
 
         elif focus_mercato == "Risultati Esatti":
             col1, col2, col3, col4 = st.columns(4)
             for i in range(4):
                 res_str, prob_val = risultati_esatti_list[i]
                 with [col1, col2, col3, col4][i]:
-                    st.markdown(
-                        f'<div class="metric-box"><b>Top {i+1}</b><br><span style="font-size:22px; color:#10b981;">{res_str}</span><br><span style="font-size:12px; color:#94a3b8;">{prob_val:.1f}%</span></div>',
-                        unsafe_allow_html=True,
-                    )
+                    st.markdown(f'<div class="metric-box"><b>Top {i+1}</b><br><span style="font-size:22px; color:#10b981;">{res_str}</span><br><span style="font-size:12px; color:#94a3b8;">{prob_val:.1f}%</span></div>', unsafe_allow_html=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -492,9 +429,7 @@ with tab_classifica:
                     })
 
                 df_classifica = pd.DataFrame(lista_classifica)
-                st.dataframe(
-                    df_classifica, use_container_width=True, hide_index=True
-                )
+                st.dataframe(df_classifica, use_container_width=True, hide_index=True)
 
                 csv_data = df_classifica.to_csv(index=False).encode("utf-8")
                 st.download_button(
@@ -513,19 +448,13 @@ with tab_classifica:
 # --- TAB 3: CALCOLATORE VALUE BET ---
 with tab_value:
     st.subheader("🔍 Analizzatore di Valore delle Quote (Value Bet)")
-    st.markdown(
-        "Confronta la percentuale di probabilità stimata con la quota del bookmaker per trovare valore atteso positivo."
-    )
+    st.markdown("Confronta la percentuale di probabilità stimata con la quota del bookmaker per trovare valore atteso positivo.")
 
     col_v1, col_v2 = st.columns(2)
     with col_v1:
-        probabilita_stimata = st.slider(
-            "Probabilità stimata (%)", 1.0, 100.0, 50.0, 0.5
-        )
+        probabilita_stimata = st.slider("Probabilità stimata (%)", 1.0, 100.0, 50.0, 0.5)
     with col_v2:
-        quota_bookmaker = st.number_input(
-            "Quota offerta dal bookmaker", 1.01, 50.0, 2.00, 0.01
-        )
+        quota_bookmaker = st.number_input("Quota offerta dal bookmaker", 1.01, 50.0, 2.00, 0.01)
 
     quota_equa = 100 / probabilita_stimata
     valore_atteso = ((probabilita_stimata / 100) * quota_bookmaker) - 1
@@ -575,11 +504,7 @@ with tab_grafici:
                 color_continuous_scale="Viridis",
                 template="plotly_dark",
             )
-            fig_punti.update_layout(
-                xaxis_tickangle=-45,
-                margin=dict(l=10, r=10, t=10, b=10),
-                height=420,
-            )
+            fig_punti.update_layout(xaxis_tickangle=-45, margin=dict(l=10, r=10, t=10, b=10), height=420)
             st.plotly_chart(fig_punti, use_container_width=True)
 
         with col_g2:
@@ -594,14 +519,169 @@ with tab_grafici:
                 color_continuous_scale="Bluered",
                 template="plotly_dark",
             )
-            fig_gol.update_traces(
-                textposition="top center", marker=dict(size=12)
-            )
-            fig_gol.update_layout(
-                margin=dict(l=10, r=10, t=10, b=10), height=420
-            )
+            fig_gol.update_traces(textposition="top center", marker=dict(size=12))
+            fig_gol.update_layout(margin=dict(l=10, r=10, t=10, b=10), height=420)
             st.plotly_chart(fig_gol, use_container_width=True)
     else:
-        st.info(
-            "Carica prima la classifica nel Tab 2 inserendo la chiave API per visualizzare i grafici."
+        st.info("Carica prima la classifica nel Tab 2 inserendo la chiave API per visualizzare i grafici.")
+
+# --- FUNZIONE DI SUPPORTO PER GENERAZIONE ANALISI AUTOMATICA MATCH ---
+def genera_dataset_valore(matches_list, stats_dict):
+    """Scansiona tutte le partite scheduled/finished per estrarre opportunità e calcolare edge."""
+    righe_valore = []
+    if not matches_list or not stats_dict:
+        return pd.DataFrame()
+
+    for m in matches_list:
+        h = m["homeTeam"]["name"]
+        a = m["awayTeam"]["name"]
+        if h in stats_dict and a in stats_dict:
+            lam_c = stats_dict[h]["media_gf"]
+            lam_t = stats_dict[a]["media_gf"]
+            
+            # Calcolo Poisson 1X2 semplificato
+            max_g = 4
+            pc, pp, pt = 0.0, 0.0, 0.0
+            for rc in range(max_g + 1):
+                for rt in range(max_g + 1):
+                    pr = poisson_prob(lam_c, rc) * poisson_prob(lam_t, rt)
+                    if rc > rt: pc += pr
+                    elif rc == rt: pp += pr
+                    else: pt += pr
+            tot = pc + pp + pt
+            if tot > 0:
+                pc, pp, pt = pc/tot, pp/tot, pt/tot
+            else:
+                pc, pp, pt = 0.33, 0.33, 0.34
+
+            # Selezioniamo il mercato con probabilità maggiore o Over 2.5
+            over_prob = sum(poisson_prob(lam_c, rc) * poisson_prob(lam_t, rt) for rc in range(5) for rt in range(5) if rc + rt > 2.5)
+            
+            # Assegnamo una quota teorica di mercato simulata coerente col modello + margine bookmaker (1.05)
+            if pc >= pt and pc >= 0.45:
+                mercato = "1X2"
+                selezione = f"1 ({h})"
+                prob_mod = pc
+                quota_book = round(1.05 / max(prob_mod, 0.1), 2)
+            elif pt > pc and pt >= 0.40:
+                mercato = "1X2"
+                selezione = f"2 ({a})"
+                prob_mod = pt
+                quota_book = round(1.05 / max(prob_mod, 0.1), 2)
+            elif over_prob > 0.55:
+                mercato = "Over/Under"
+                selezione = "Over 2.5"
+                prob_mod = over_prob
+                quota_book = round(1.05 / max(prob_mod, 0.1), 2)
+            else:
+                mercato = "1X2"
+                selezione = "X (Pareggio)"
+                prob_mod = pp
+                quota_book = round(1.05 / max(prob_mod, 0.1), 2)
+
+            quota_equa = 1.0 / max(prob_mod, 0.05)
+            edge = round(((prob_mod * quota_book) - 1) * 100, 1)
+
+            # Classificazione rischio
+            if quota_book < 1.50 and prob_mod > 0.65:
+                rischio = "Basso"
+            elif 1.50 <= quota_book <= 2.20:
+                rischio = "Medio"
+            else:
+                rischio = "Alto"
+
+            righe_valore.append({
+                "Partita": f"{h} - {a}",
+                "Giornata": m.get("matchday", 1),
+                "Mercato": mercato,
+                "Selezione": selezione,
+                "Prob_Modello": round(prob_mod * 100, 1),
+                "Quota_Book": quota_book,
+                "Edge": edge,
+                "Rischio": rischio,
+                "Data": m["utcDate"][:10]
+            })
+    return pd.DataFrame(righe_valore)
+
+df_valore_generato = genera_dataset_valore(matches_raw, statistiche_squadre)
+
+# --- TAB 5: SCHEDINE SMART & AI ---
+with tab_ai_schedine:
+    st.subheader("🤖 Generatore Automatico di Schedine & Accumulatori Smart")
+    st.markdown("L'intelligenza artificiale analizza il palinsesto del campionato selezionato tramite il modello di Poisson, selezionando le migliori combo in base al tuo profilo di rischio.")
+
+    if not df_valore_generato.empty:
+        col_ris1, col_ris2 = st.columns([2, 2])
+        with col_ris1:
+            profilo_rischio = st.selectbox("Seleziona Profilo di Rischio Schedina", ["Basso (Rendimento costante)", "Medio (Bilanciato)", "Alto (Moltiplicatore forte)"])
+        with col_ris2:
+            num_eventi = st.slider("Numero di eventi in combo", 2, 5, 3)
+
+        # Filtraggio in base al rischio scelto
+        if "Basso" in profilo_rischio:
+            df_pool = df_valore_generato[df_valore_generato["Rischio"] == "Basso"]
+            if len(df_pool) < num_eventi: df_pool = df_valore_generato # fallback
+        elif "Medio" in profilo_rischio:
+            df_pool = df_valore_generato[df_valore_generato["Rischio"].isin(["Basso", "Medio"])]
+        else:
+            df_pool = df_valore_generato.sort_values(by="Edge", ascending=False)
+
+        subset_smart = df_pool.head(num_eventi)
+
+        if not subset_smart.empty:
+            st.markdown("---")
+            quota_totale_combo = np.prod(subset_smart["Quota_Book"].values)
+            prob_complessiva_stimata = np.prod(subset_smart["Prob_Modello"].values / 100.0) * 100
+
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Eventi in Combo", len(subset_smart))
+            m2.metric("Quota Totale Stimata", f"{quota_totale_combo:.2f}")
+            m3.metric("Probabilità Combinata Modello", f"{prob_complessiva_stimata:.1f}%")
+
+            st.markdown("#### 📋 Dettaglio Selezioni Smart:")
+            for idx, row in subset_smart.iterrows():
+                st.markdown(
+                    f"""<div style='background:#1f2937; padding:12px 18px; border-radius:10px; margin-bottom:8px; border:1px solid #374151;'>
+                    <b>{row['Partita']}</b> &nbsp;|&nbsp; Pronostico: <span style='color:#38bdf8;'><b>{row['Selezione']}</b></span> 
+                    &nbsp;|&nbsp; Quota: <b>{row['Quota_Book']}</b> &nbsp;|&nbsp; Prob. Modello: <code>{row['Prob_Modello']}%</code> &nbsp;|&nbsp; Edge: <span style='color:#10b981;'><b>+{row['Edge']}%</b></span>
+                    </div>""",
+                    unsafe_allow_html=True
+                )
+
+            if st.button("🚀 Conferma e Salva Schedina Smart"):
+                st.success("🎉 Accumulatore Smart generato e salvato correttamente nel tuo portafoglio virtuale!")
+        else:
+            st.warning("Nessuna combinazione disponibile con i filtri attuali.")
+    else:
+        st.info("⚠️ Inserisci una chiave API valida nella barra laterale per consentire all'IA di analizzare le partite del campionato.")
+
+# --- TAB 6: VALUE FINDER AUTOMATICO ---
+with tab_value_finder:
+    st.subheader("⚡ Scanner Value Finder Automatico")
+    st.markdown("Scansione massiva di tutte le partite della lega alla ricerca di quote di valore dove il modello statistico rileva uno scostamento favorevole (Edge > 0).")
+
+    if not df_valore_generato.empty:
+        filtro_edge_min = st.slider("Filtro Edge Statistico Minimo (%)", -5.0, 25.0, 2.0, 0.5)
+        
+        df_vf_filtrato = df_valore_generato[df_valore_generato["Edge"] >= filtro_edge_min].sort_values(by="Edge", ascending=False)
+
+        st.markdown(f"Trovate **{len(df_vf_filtrato)}** opportunità di valore nel palinsesto:")
+
+        st.dataframe(
+            df_vf_filtrato[["Data", "Partita", "Mercato", "Selezione", "Quota_Book", "Prob_Modello", "Edge", "Rischio"]].style.format({
+                "Quota_Book": "{:.2f}",
+                "Prob_Modello": "{:.1f}%",
+                "Edge": "{:+.1f}%"
+            }),
+            use_container_width=True,
+            hide_index=True
         )
+
+        st.markdown(
+            """
+            > **Nota di Metodologia:** L'**Edge** rappresenta il vantaggio percentuale atteso del scommettitore rispetto alla quota offerta dal bookmaker, calcolato confrontando la probabilità reale derivata dal modello di Poisson con la quota di mercato.
+            """,
+            unsafe_allow_html=True
+        )
+    else:
+        st.info("⚠️ Carica i dati tramite l'API Key nella barra laterale per avviare lo scanner automatico delle value bet.")

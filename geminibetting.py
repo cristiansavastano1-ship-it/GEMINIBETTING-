@@ -1,4 +1,6 @@
+import math
 import pandas as pd
+import plotly.express as px
 import requests
 import streamlit as st
 
@@ -9,7 +11,7 @@ st.set_page_config(
     page_icon="⚽",
 )
 
-# Stile CSS avanzato per leggibilità perfetta e box informativi
+# Stile CSS avanzato per leggibilità perfetta
 st.markdown(
     """
     <style>
@@ -20,7 +22,6 @@ st.markdown(
     .value-box { background-color: #064e3b; border-left: 6px solid #10b981; padding: 18px; border-radius: 10px; margin-top: 15px; color: #ecfdf5; }
     .no-value-box { background-color: #7f1d1d; border-left: 6px solid #ef4444; padding: 18px; border-radius: 10px; margin-top: 15px; color: #fef2f2; }
     
-    /* FIX DEFINITIVO PER I TESTI DEL RADIO BUTTON */
     div.row-widget.stRadio div[role="radiogroup"] label p {
         color: #ffffff !important;
         font-weight: 700 !important;
@@ -36,10 +37,9 @@ st.markdown(
 
 st.title("⚽ Pro Betting Studio & Deep Match Analytics")
 st.markdown(
-    "Piattaforma multi-campionato avanzata per l'analisi statistica e il value betting."
+    "Piattaforma multi-campionato avanzata con modello di Poisson, grafici interattivi ed export dati."
 )
 
-# Dizionario dei campionati supportati con codici ufficiali
 LEAGUES = {
     "Serie A (Italia)": "SA",
     "Premier League (Inghilterra)": "PL",
@@ -50,7 +50,7 @@ LEAGUES = {
     "Champions League": "CL",
 }
 
-# Sidebar per la configurazione
+# Sidebar
 st.sidebar.header("⚙️ Configurazione")
 api_key = st.sidebar.text_input(
     "Inserisci API Key (football-data.org)", type="password"
@@ -60,11 +60,11 @@ campionato_scelto = st.sidebar.selectbox(
 )
 codice_lega = LEAGUES[campionato_scelto]
 
-# Navigazione a 3 Tab
-tab_calendario, tab_classifica, tab_value = st.tabs([
+tab_calendario, tab_classifica, tab_value, tab_grafici = st.tabs([
     "📅 Calendario & Studio Match",
-    "🏆 Classifica Live",
+    "🏆 Classifica & Export",
     "🔍 Calcolatore Value Bet",
+    "📊 Grafici & Trend",
 ])
 
 
@@ -98,13 +98,43 @@ def scarica_classifica(chiave, league_code):
     return None
 
 
-# --- TAB 1: CALENDARIO E STUDIO STATISTICO COERENTE ---
+# Funzione di Poisson per calcolo esatto gol
+def poisson_prob(lmbda, k):
+    return (math.exp(-lmbda) * (lmbda**k)) / math.factorial(k)
+
+
+# Funzione per estrarre la forma recente (ultime 5 partite) dalle partite concluse
+def calcola_forma_recente(matches_list, nome_squadra):
+    partite_squadra = []
+    for m in matches_list:
+        if m["status"] == "FINISHED":
+            h = m["homeTeam"]["name"]
+            a = m["awayTeam"]["name"]
+            if h == nome_squadra or a == nome_squadra:
+                gh = m["score"]["fullTime"].get("home", 0)
+                ga = m["score"]["fullTime"].get("away", 0)
+                if gh is not None and ga is not None:
+                    if h == nome_squadra:
+                        res = "V" if gh > ga else ("P" if gh == ga else "S")
+                    else:
+                        res = "V" if ga > gh else ("P" if ga == gh else "S")
+                    partite_squadra.append(res)
+    # Prendi le ultime 5
+    ultime = partite_squadra[-5:] if len(partite_squadra) >= 5 else partite_squadra
+    return "".join(ultime) if ultime else "N/D"
+
+
+# --- TAB 1: CALENDARIO E STUDIO STATISTICO ---
 with tab_calendario:
     statistiche_squadre = {}
-    
+    matches_raw = []
+
     if api_key:
         dati = scarica_dati(api_key, codice_lega)
         dati_classifica = scarica_classifica(api_key, codice_lega)
+
+        if dati and "matches" in dati:
+            matches_raw = dati["matches"]
 
         if dati_classifica and "standings" in dati_classifica:
             for s in dati_classifica["standings"]:
@@ -118,11 +148,14 @@ with tab_calendario:
                             "media_gf": gf / giocate,
                             "media_gs": gs / giocate,
                             "punti": riga["points"],
+                            "forma": calcola_forma_recente(
+                                matches_raw, nome_sq
+                            ),
                         }
 
-        if dati and "matches" in dati:
+        if matches_raw:
             lista = []
-            for m in dati["matches"]:
+            for m in matches_raw:
                 g_casa = (
                     m["score"]["fullTime"].get("home")
                     if m.get("score") and m["score"].get("fullTime")
@@ -157,11 +190,15 @@ with tab_calendario:
                 )
                 partite_filtrate = df[df["giornata"] == giornata_sel]
 
-                st.markdown(f"### 📌 Partite in programma - Giornata {int(giornata_sel)}")
+                st.markdown(
+                    f"### 📌 Partite in programma - Giornata {int(giornata_sel)}"
+                )
 
                 for idx, row in partite_filtrate.iterrows():
                     with st.container():
-                        st.markdown('<div class="match-card">', unsafe_allow_html=True)
+                        st.markdown(
+                            '<div class="match-card">', unsafe_allow_html=True
+                        )
                         c1, c2, c3 = st.columns([3, 2, 2])
                         with c1:
                             st.markdown(
@@ -174,283 +211,206 @@ with tab_calendario:
                                 unsafe_allow_html=True,
                             )
                         with c3:
-                            if st.button("📊 Studio Avanzato", key=f"btn_match_{idx}"):
+                            if st.button(
+                                "📊 Studio Avanzato (Poisson)",
+                                key=f"btn_match_{idx}",
+                            ):
                                 st.session_state["match_attivo"] = row
                         st.markdown("</div>", unsafe_allow_html=True)
         else:
-            st.error("Impossibile scaricare i dati. Verifica la correttezza della chiave API.")
+            st.error(
+                "Impossibile scaricare i dati. Verifica la correttezza della chiave API."
+            )
     else:
-        st.warning("👈 Inserisci la tua API Key gratuita nella barra laterale per caricare i campionati.")
+        st.warning(
+            "👈 Inserisci la tua API Key gratuita nella barra laterale per caricare i campionati."
+        )
 
-    # SEZIONE STUDIO DETTAGLIATO COERENTE
+    # STUDIO DETTAGLIATO CON MODELLO DI POISSON
     if "match_attivo" in st.session_state:
         m = st.session_state["match_attivo"]
         sq_casa = m["casa"]
         sq_trasf = m["trasferta"]
 
         if sq_casa in statistiche_squadre and sq_trasf in statistiche_squadre:
-            med_gf_casa = statistiche_squadre[sq_casa]["media_gf"]
-            med_gs_casa = statistiche_squadre[sq_casa]["media_gs"]
-            med_gf_trasf = statistiche_squadre[sq_trasf]["media_gf"]
-            med_gs_trasf = statistiche_squadre[sq_trasf]["media_gs"]
-            punti_casa = statistiche_squadre[sq_casa]["punti"]
-            punti_trasf = statistiche_squadre[sq_trasf]["punti"]
+            lam_c = statistiche_squadre[sq_casa]["media_gf"]
+            lam_t = statistiche_squadre[sq_trasf]["media_gf"]
+            forma_casa = statistiche_squadre[sq_casa]["forma"]
+            forma_trasf = statistiche_squadre[sq_trasf]["forma"]
         else:
-            seed_c = sum(ord(c) for c in sq_casa)
-            seed_t = sum(ord(c) for c in sq_trasf)
-            med_gf_casa = 1.3 + (seed_c % 10) / 10.0
-            med_gs_casa = 1.0 + (seed_c % 8) / 10.0
-            med_gf_trasf = 1.2 + (seed_t % 10) / 10.0
-            med_gs_trasf = 1.1 + (seed_t % 9) / 10.0
-            punti_casa = seed_c % 40
-            punti_trasf = seed_t % 40
+            lam_c, lam_t = 1.4, 1.1
+            forma_casa, forma_trasf = "N/D", "N/D"
 
-        forza_casa = punti_casa + (med_gf_casa - med_gs_casa) * 5
-        forza_trasf = punti_trasf + (med_gf_trasf - med_gs_trasf) * 5
+        # Calcolo Matrice Poisson per esiti e risultati esatti
+        max_gol = 5
+        matrice_prob = [[0.0] * (max_gol + 1) for _ in range(max_gol + 1)]
+        p_casa, p_pareggio, p_trasferta = 0.0, 0.0, 0.0
 
-        diff_forza = forza_casa - forza_trasf
-        if diff_forza > 5:
-            p_c_1x2, p_p_1x2, p_t_1x2 = 58, 26, 16
-        elif diff_forza < -5:
-            p_c_1x2, p_p_1x2, p_t_1x2 = 22, 28, 50
-        else:
-            p_c_1x2, p_p_1x2, p_t_1x2 = 40, 32, 28
+        for r_c in range(max_gol + 1):
+            for r_t in range(max_gol + 1):
+                prob = poisson_prob(lam_c, r_c) * poisson_prob(lam_t, r_t)
+                matrice_prob[r_c][r_t] = prob
+                if r_c > r_t:
+                    p_casa += prob
+                elif r_c == r_t:
+                    p_pareggio += prob
+                else:
+                    p_trasferta += prob
 
-        xg_stimati = round(med_gf_casa + med_gf_trasf, 2)
-        over_25_rate = min(max(int((xg_stimati / 2.8) * 100), 30), 85)
-        btts_rate = min(max(int(((med_gf_casa + med_gf_trasf) / 3.0) * 100), 35), 80)
+        tot_1x2 = p_casa + p_pareggio + p_trasferta
+        p_c_1x2 = round((p_casa / tot_1x2) * 100, 1)
+        p_p_1x2 = round((p_pareggio / tot_1x2) * 100, 1)
+        p_t_1x2 = round((p_trasferta / tot_1x2) * 100, 1)
 
-        if p_c_1x2 >= p_t_1x2:
-            gol_c_est = max(1, round(med_gf_casa))
-            gol_t_est = max(0, round(med_gf_trasf - 0.2))
-        else:
-            gol_c_est = max(0, round(med_gf_casa - 0.2))
-            gol_t_est = max(1, round(med_gf_trasf))
+        xg_stimati = round(lam_c + lam_t, 2)
 
-        risultati_possibili = [
-            (f"{gol_c_est} - {gol_t_est}", "42% Prob."),
-            (f"{max(0, gol_c_est - 1)} - {gol_t_est}", "28% Prob."),
-            (f"{gol_c_est + 1} - {gol_t_est}", "18% Prob."),
-            (f"{gol_c_est} - {max(0, gol_t_est + 1)}", "12% Prob."),
-        ]
+        # Trova top 3 risultati esatti
+        risultati_esatti_list = []
+        for r_c in range(4):
+            for r_t in range(4):
+                p_res = (
+                    poisson_prob(lam_c, r_c)
+                    * poisson_prob(lam_t, r_t)
+                    / tot_1x2
+                )
+                risultati_esatti_list.append(
+                    (f"{r_c} - {r_t}", p_res * 100)
+                )
+        risultati_esatti_list.sort(key=lambda x: x[1], reverse=True)
 
-        combo_1 = (
-            "1 + Over 1.5"
-            if p_c_1x2 > 40
-            else ("X2 + Over 1.5" if p_t_1x2 > 40 else "1X + Under 3.5")
+        btts_rate = round(
+            sum(
+                poisson_prob(lam_c, r_c) * poisson_prob(lam_t, r_t)
+                for r_c in range(1, 5)
+                for r_t in range(1, 5)
+            )
+            * 100,
+            1,
         )
-        combo_2 = "1X + Goal (BTTS)" if btts_rate > 50 else "X2 + No Goal"
-        combo_3 = (
-            "1 + Multigol 2-4" if p_c_1x2 >= p_t_1x2 else "2 + Multigol 2-4"
+        over_25_rate = round(
+            sum(
+                poisson_prob(lam_c, r_c) * poisson_prob(lam_t, r_t)
+                for r_c in range(6)
+                for r_t in range(6)
+                if r_c + r_t > 2.5
+            )
+            * 100,
+            1,
         )
-
-        tiri_porta_casa = round(4.0 + med_gf_casa, 1)
-        tiri_porta_trasf = round(3.8 + med_gf_trasf, 1)
-        corner_totali = round(9.2 + (xg_stimati * 0.4), 1)
 
         st.markdown('<div class="analysis-container">', unsafe_allow_html=True)
         st.markdown(
-            f"<h2>🔬 Analisi Avanzata: {sq_casa} vs {sq_trasf}</h2>",
+            f"<h2>🔬 Studio Matematico (Poisson): {sq_casa} vs {sq_trasf}</h2>",
             unsafe_allow_html=True,
+        )
+        st.markdown(
+            f"**Forma Recente (Ultime 5):** 🏠 {sq_casa} `[{forma_casa}]` | ✈️ {sq_trasf} `[{forma_trasf}]`"
         )
 
         focus_mercato = st.radio(
-            "🎯 Seleziona il Focus di Mercato da Analizzare",
+            "🎯 Seleziona il Focus di Analisi",
             [
-                "Panoramica Generale",
+                "Panoramica Poisson",
                 "1X2 & Doppia Chance",
                 "Gol / No Gol & Over/Under",
                 "Risultati Esatti",
-                "⚡ Combo Consigliate",
-                "🎯 Tiri & Corner",
-                "Primo / Secondo Tempo",
             ],
             horizontal=True,
         )
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        if focus_mercato == "Panoramica Generale":
+        if focus_mercato == "Panoramica Poisson":
             col1, col2, col3, col4 = st.columns(4)
             with col1:
                 st.markdown(
-                    f'<div class="metric-box"><b>Media Gol ({sq_casa})</b><br><span style="font-size:24px; color:#38bdf8;">{med_gf_casa:.2f}</span></div>',
+                    f'<div class="metric-box"><b>Lambda Casa (xG)</b><br><span style="font-size:24px; color:#38bdf8;">{lam_c:.2f}</span></div>',
                     unsafe_allow_html=True,
                 )
             with col2:
                 st.markdown(
-                    f'<div class="metric-box"><b>Media Gol ({sq_trasf})</b><br><span style="font-size:24px; color:#38bdf8;">{med_gf_trasf:.2f}</span></div>',
+                    f'<div class="metric-box"><b>Lambda Trasf (xG)</b><br><span style="font-size:24px; color:#38bdf8;">{lam_t:.2f}</span></div>',
                     unsafe_allow_html=True,
                 )
             with col3:
                 st.markdown(
-                    f'<div class="metric-box"><b>xG Stimati</b><br><span style="font-size:24px; color:#38bdf8;">{xg_stimati}</span></div>',
+                    f'<div class="metric-box"><b>xG Totali Match</b><br><span style="font-size:24px; color:#38bdf8;">{xg_stimati}</span></div>',
                     unsafe_allow_html=True,
                 )
             with col4:
                 st.markdown(
-                    f'<div class="metric-box"><b>Over 2.5 Prob.</b><br><span style="font-size:24px; color:#38bdf8;">{over_25_rate}%</span></div>',
+                    f'<div class="metric-box"><b>Over 2.5 (Poisson)</b><br><span style="font-size:24px; color:#38bdf8;">{over_25_rate}%</span></div>',
                     unsafe_allow_html=True,
                 )
 
         elif focus_mercato == "1X2 & Doppia Chance":
-            st.markdown("#### ⚖️ Statistiche Esito Finale (1X2 & Doppia Chance)")
+            st.markdown(
+                "#### ⚖️ Probabilità Reali calcolate con Legge di Poisson"
+            )
             col1, col2, col3, col4 = st.columns(4)
             with col1:
                 st.markdown(
-                    f'<div class="metric-box"><b>Vittorie Casa</b><br><span style="font-size:22px; color:#38bdf8;">{p_c_1x2}%</span></div>',
+                    f'<div class="metric-box"><b>Segno 1</b><br><span style="font-size:22px; color:#38bdf8;">{p_c_1x2}%</span></div>',
                     unsafe_allow_html=True,
                 )
             with col2:
                 st.markdown(
-                    f'<div class="metric-box"><b>Pareggi</b><br><span style="font-size:22px; color:#38bdf8;">{p_p_1x2}%</span></div>',
+                    f'<div class="metric-box"><b>Segno X</b><br><span style="font-size:22px; color:#38bdf8;">{p_p_1x2}%</span></div>',
                     unsafe_allow_html=True,
                 )
             with col3:
                 st.markdown(
-                    f'<div class="metric-box"><b>Vittorie Trasf</b><br><span style="font-size:22px; color:#38bdf8;">{p_t_1x2}%</span></div>',
+                    f'<div class="metric-box"><b>Segno 2</b><br><span style="font-size:22px; color:#38bdf8;">{p_t_1x2}%</span></div>',
                     unsafe_allow_html=True,
                 )
             with col4:
-                dc_consigliata = (
+                dc = (
                     "1X"
                     if p_c_1x2 >= p_t_1x2
                     else ("X2" if p_t_1x2 > p_c_1x2 else "12")
                 )
                 st.markdown(
-                    f'<div class="metric-box"><b>Doppia Chance</b><br><span style="font-size:22px; color:#10b981;">{dc_consigliata}</span></div>',
+                    f'<div class="metric-box"><b>Doppia Chance Consigliata</b><br><span style="font-size:22px; color:#10b981;">{dc}</span></div>',
                     unsafe_allow_html=True,
                 )
-            st.info(
-                f"💡 **Nota 1X2 per {sq_casa} vs {sq_trasf}:** I dati stagionali assegnano un vantaggio al segno {dc_consigliata} con un'alta copertura statistica."
-            )
 
         elif focus_mercato == "Gol / No Gol & Over/Under":
-            st.markdown("#### ⚽ Statistiche Gol (BTTS & Over/Under)")
-            col1, col2, col3, col4 = st.columns(4)
+            st.markdown("#### ⚽ Mercati dei Gol (Poisson)")
+            col1, col2, col3 = st.columns(3)
             with col1:
                 st.markdown(
-                    f'<div class="metric-box"><b>BTTS (Gol/Gol)</b><br><span style="font-size:22px; color:#38bdf8;">{btts_rate}%</span></div>',
+                    f'<div class="metric-box"><b>BTTS (Gol / Gol)</b><br><span style="font-size:22px; color:#38bdf8;">{btts_rate}%</span></div>',
                     unsafe_allow_html=True,
                 )
             with col2:
-                over_15 = min(over_25_rate + 25, 92)
                 st.markdown(
-                    f'<div class="metric-box"><b>Over 1.5 Rate</b><br><span style="font-size:22px; color:#38bdf8;">{over_15}%</span></div>',
+                    f'<div class="metric-box"><b>Over 2.5 Gol</b><br><span style="font-size:22px; color:#38bdf8;">{over_25_rate}%</span></div>',
                     unsafe_allow_html=True,
                 )
             with col3:
                 st.markdown(
-                    f'<div class="metric-box"><b>Over 2.5 Rate</b><br><span style="font-size:22px; color:#38bdf8;">{over_25_rate}%</span></div>',
+                    f'<div class="metric-box"><b>Under 2.5 Gol</b><br><span style="font-size:22px; color:#38bdf8;">{round(100 - over_25_rate, 1)}%</span></div>',
                     unsafe_allow_html=True,
                 )
-            with col4:
-                clean_sheet_val = max(10, 50 - int(btts_rate / 2))
-                st.markdown(
-                    f'<div class="metric-box"><b>Clean Sheet Casa</b><br><span style="font-size:22px; color:#38bdf8;">{clean_sheet_val}%</span></div>',
-                    unsafe_allow_html=True,
-                )
-            consiglio_gol = (
-                "Over 2.5 / Gol"
-                if over_25_rate > 55
-                else "Under 2.5 / No Gol prudente"
-            )
-            st.success(
-                f"💡 **Consiglio Mercato:** Per questo incontro il trend suggerisce opzioni orientate verso **{consiglio_gol}** in base alla media realizzativa."
-            )
 
         elif focus_mercato == "Risultati Esatti":
-            st.markdown("#### 🎯 Previsione Risultati Esatti Finali")
+            st.markdown(
+                "#### 🎯 Top 4 Risultati Esatti più probabili secondo Poisson"
+            )
             col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                st.markdown(
-                    f'<div class="metric-box"><b>1° Risultato Top</b><br><span style="font-size:22px; color:#10b981;">{risultati_possibili[0][0]}</span><br><span style="font-size:12px; color:#94a3b8;">{risultati_possibili[0][1]}</span></div>',
-                    unsafe_allow_html=True,
-                )
-            with col2:
-                st.markdown(
-                    f'<div class="metric-box"><b>2° Risultato</b><br><span style="font-size:22px; color:#38bdf8;">{risultati_possibili[1][0]}</span><br><span style="font-size:12px; color:#94a3b8;">{risultati_possibili[1][1]}</span></div>',
-                    unsafe_allow_html=True,
-                )
-            with col3:
-                st.markdown(
-                    f'<div class="metric-box"><b>3° Risultato</b><br><span style="font-size:22px; color:#38bdf8;">{risultati_possibili[2][0]}</span><br><span style="font-size:12px; color:#94a3b8;">{risultati_possibili[2][1]}</span></div>',
-                    unsafe_allow_html=True,
-                )
-            with col4:
-                st.markdown(
-                    f'<div class="metric-box"><b>Copertura / Jolly</b><br><span style="font-size:22px; color:#facc15;">{risultati_possibili[3][0]}</span><br><span style="font-size:12px; color:#94a3b8;">{risultati_possibili[3][1]}</span></div>',
-                    unsafe_allow_html=True,
-                )
-            st.info("💡 **Analisi Risultato Esatto:** Punteggi stimati in perfetta coerenza con le percentuali di vittoria 1X2.")
-
-        elif focus_mercato == "⚡ Combo Consigliate":
-            st.markdown("#### ⚡ Combo e Mercati Combinati")
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.markdown(
-                    f'<div class="metric-box"><b>Combo Principale</b><br><span style="font-size:20px; color:#10b981;">{combo_1}</span></div>',
-                    unsafe_allow_html=True,
-                )
-            with col2:
-                st.markdown(
-                    f'<div class="metric-box"><b>Combo Gol</b><br><span style="font-size:20px; color:#38bdf8;">{combo_2}</span></div>',
-                    unsafe_allow_html=True,
-                )
-            with col3:
-                st.markdown(
-                    f'<div class="metric-box"><b>Combo Alternativa</b><br><span style="font-size:20px; color:#facc15;">{combo_3}</span></div>',
-                    unsafe_allow_html=True,
-                )
-            st.success("💡 **Consiglio Combo:** Le combo uniscono l'esito 1X2 o la doppia chance ai gol stimati per alzare la quota con criterio statistico.")
-
-        elif focus_mercato == "🎯 Tiri & Corner":
-            st.markdown("#### 🎯 Statistiche Tiri in Porta & Calci d'Angolo")
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.markdown(
-                    f'<div class="metric-box"><b>Tiri in Porta ({sq_casa})</b><br><span style="font-size:22px; color:#38bdf8;">~{tiri_porta_casa} a match</span></div>',
-                    unsafe_allow_html=True,
-                )
-            with col2:
-                st.markdown(
-                    f'<div class="metric-box"><b>Tiri in Porta ({sq_trasf})</b><br><span style="font-size:22px; color:#38bdf8;">~{tiri_porta_trasf} a match</span></div>',
-                    unsafe_allow_html=True,
-                )
-            with col3:
-                st.markdown(
-                    f'<div class="metric-box"><b>Corner Totali Stimati</b><br><span style="font-size:22px; color:#10b981;">~{corner_totali} totali</span></div>',
-                    unsafe_allow_html=True,
-                )
-            st.warning("💡 **Nota Corner & Tiri:** Ottimo per mercati come Over 8.5/9.5 Corner o scommesse sui tiri in porta di squadra.")
-
-        elif focus_mercato == "Primo / Secondo Tempo":
-            st.markdown("#### ⏱️ Analisi Frazioni di Gioco (1°T / 2°T)")
-            col1, col2, col3 = st.columns(3)
-            p_1t = max(35, min(60, int(over_25_rate * 0.7)))
-            p_2t = 100 - p_1t
-            with col1:
-                st.markdown(
-                    f'<div class="metric-box"><b>Gol nel 1° Tempo</b><br><span style="font-size:22px; color:#38bdf8;">{p_1t}%</span></div>',
-                    unsafe_allow_html=True,
-                )
-            with col2:
-                st.markdown(
-                    f'<div class="metric-box"><b>Gol nel 2° Tempo</b><br><span style="font-size:22px; color:#38bdf8;">{p_2t}%</span></div>',
-                    unsafe_allow_html=True,
-                )
-            with col3:
-                st.markdown(
-                    '<div class="metric-box"><b>Time Gol Più Frequente</b><br><span style="font-size:22px; color:#38bdf8;">76\'-90\'</span></div>',
-                    unsafe_allow_html=True,
-                )
-            st.warning("💡 **Nota Tempo:** Le curve realizzative mostrano una maggiore concentrazione di reti nella seconda frazione di gioco.")
+            for i in range(4):
+                res_str, prob_val = risultati_esatti_list[i]
+                with [col1, col2, col3, col4][i]:
+                    st.markdown(
+                        f'<div class="metric-box"><b>{i+1}° Scelta</b><br><span style="font-size:22px; color:#10b981;">{res_str}</span><br><span style="font-size:12px; color:#94a3b8;">{prob_val:.1f}% prob.</span></div>',
+                        unsafe_allow_html=True,
+                    )
 
         st.markdown("</div>", unsafe_allow_html=True)
 
-# --- TAB 2: CLASSIFICA LIVE ---
+# --- TAB 2: CLASSIFICA & EXPORT ---
 with tab_classifica:
-    st.subheader(f"🏆 Classifica Ufficiale - {campionato_scelto}")
+    st.subheader(f"🏆 Classifica Ufficiale ed Export Dati - {campionato_scelto}")
 
     if api_key:
         dati_classifica = scarica_classifica(api_key, codice_lega)
@@ -478,11 +438,22 @@ with tab_classifica:
                     })
 
                 df_classifica = pd.DataFrame(lista_classifica)
-                st.dataframe(df_classifica, use_container_width=True, hide_index=True)
+                st.dataframe(
+                    df_classifica, use_container_width=True, hide_index=True
+                )
+
+                # Pulsante di export CSV
+                csv_data = df_classifica.to_csv(index=False).encode("utf-8")
+                st.download_button(
+                    label="📥 Scarica Classifica in formato CSV",
+                    data=csv_data,
+                    file_name=f"classifica_{codice_lega}.csv",
+                    mime="text/csv",
+                )
             else:
-                st.warning("Classifica non disponibile per questo torneo.")
+                st.warning("Classifica non disponibile.")
         else:
-            st.error("Impossibile scaricare la classifica. Verifica la chiave API o i limiti giornalieri.")
+            st.error("Impossibile scaricare la classifica.")
     else:
         st.warning("👈 Inserisci la tua API Key nella barra laterale.")
 
@@ -490,13 +461,13 @@ with tab_classifica:
 with tab_value:
     st.subheader("🔍 Analizzatore di Valore delle Quote (Value Bet)")
     st.markdown(
-        "Inserisci la percentuale di probabilità stimata dai tuoi studi e confrontala con la quota offerta dal bookmaker."
+        "Confronta la percentuale di probabilità calcolata con i dati o con Poisson rispetto alla quota del bookmaker."
     )
 
     col_v1, col_v2 = st.columns(2)
     with col_v1:
         probabilita_stimata = st.slider(
-            "La tua probabilità stimata (%)", 1.0, 100.0, 50.0, 0.5
+            "Probabilità stimata (%)", 1.0, 100.0, 50.0, 0.5
         )
     with col_v2:
         quota_bookmaker = st.number_input(
@@ -517,8 +488,8 @@ with tab_value:
             f"""
                 <div class="value-box">
                     <h4>🔥 OTTIMA VALUE BET TROVATA!</h4>
-                    <p>La quota del bookmaker (<b>{quota_bookmaker}</b>) è superiore alla quota equa stimata dai dati (<b>{quota_equa:.2f}</b>). 
-                    C'è un margine di profitto matematico a lungo termine.</p>
+                    <p>La quota del bookmaker (<b>{quota_bookmaker}</b>) è superiore alla quota equa stimata (<b>{quota_equa:.2f}</b>). 
+                    Esiste un vantaggio matematico di valore atteso positivo.</p>
                 </div>
             """,
             unsafe_allow_html=True,
@@ -528,8 +499,58 @@ with tab_value:
             """
                 <div class="no-value-box">
                     <h4>❌ NESSUN VALORE (SCONSIGLIATO)</h4>
-                    <p>La quota offerta è troppo bassa rispetto alla probabilità reale stimata. Il banco ha troppo vantaggio.</p>
+                    <p>La quota offerta è inferiore alla soglia di valore equo.</p>
                 </div>
             """,
             unsafe_allow_html=True,
+        )
+
+# --- TAB 4: GRAFICI & TREND ---
+with tab_grafici:
+    st.subheader(
+        f"📊 Analisi Grafica e Trend di Campionato - {campionato_scelto}"
+    )
+
+    if api_key and "df_classifica" in locals() and not df_classifica.empty:
+        col_g1, col_g2 = st.columns(2)
+
+        with col_g1:
+            st.markdown("##### 📈 Punti per Squadra in Classifica")
+            fig_punti = px.bar(
+                df_classifica,
+                x="Squadra",
+                y="Punti",
+                color="Punti",
+                color_continuous_scale="Viridis",
+                template="plotly_dark",
+            )
+            fig_punti.update_layout(
+                xaxis_tickangle=-45,
+                margin=dict(l=10, r=10, t=10, b=10),
+                height=400,
+            )
+            st.plotly_chart(fig_punti, use_container_width=True)
+
+        with col_g2:
+            st.markdown("##### ⚽ Gol Fatti vs Gol Subiti")
+            fig_gol = px.scatter(
+                df_classifica,
+                x="Gol Fatti",
+                y="Gol Subiti",
+                text="Squadra",
+                size="Punti",
+                color="DR",
+                color_continuous_scale="Bluered",
+                template="plotly_dark",
+            )
+            fig_gol.update_traces(
+                textposition="top center", marker=dict(size=12)
+            )
+            fig_gol.update_layout(
+                margin=dict(l=10, r=10, t=10, b=10), height=400
+            )
+            st.plotly_chart(fig_gol, use_container_width=True)
+    else:
+        st.warning(
+            "Carica prima la classifica nel Tab 2 inserendo la chiave API per sbloccare i grafici interattivi."
         )

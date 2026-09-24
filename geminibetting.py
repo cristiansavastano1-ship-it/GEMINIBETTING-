@@ -129,24 +129,28 @@ st.markdown(
 )
 
 LEAGUES = {
-    "Serie A (Italia)": "SA",
-    "Premier League (Inghilterra)": "PL",
-    "La Liga (Spagna)": "PD",
-    "Bundesliga (Germania)": "BL1",
-    "Ligue 1 (Francia)": "FL1",
-    "Eredivisie (Olanda)": "DED",
-    "Champions League": "CL",
-    "UEFA Nations League": "UNL",
+    "Serie A (Italia) [Club]": ("SA", "football-data"),
+    "Premier League (Inghilterra) [Club]": ("PL", "football-data"),
+    "La Liga (Spagna) [Club]": ("PD", "football-data"),
+    "Bundesliga (Germania) [Club]": ("BL1", "football-data"),
+    "Ligue 1 (Francia) [Club]": ("FL1", "football-data"),
+    "Eredivisie (Olanda) [Club]": ("DED", "football-data"),
+    "Champions League [Club]": ("CL", "football-data"),
+    "UEFA Nations League [Nazionali]": ("10", "api-football"), # ID 10 tipicamente associato alla Nations League su API-Football
 }
 
 api_key = st.sidebar.text_input(
-    "🔑 Inserisci API Key (football-data.org)", type="password"
+    "🔑 API Key (football-data.org - Club)", type="password"
 )
+api_key_nazionali = st.sidebar.text_input(
+    "🔑 API Key (API-Football - Nazionali)", type="password"
+)
+
 st.sidebar.markdown("---")
 campionato_scelto = st.sidebar.selectbox(
     "🏆 Seleziona Campionato / Torneo", list(LEAGUES.keys())
 )
-codice_lega = LEAGUES[campionato_scelto]
+codice_lega, tipo_fonte = LEAGUES[campionato_scelto]
 
 tab_calendario, tab_classifica, tab_value, tab_grafici, tab_ai_schedine, tab_value_finder, tab_monte_carlo = st.tabs([
     "📅 Calendario & Studio Match",
@@ -160,7 +164,7 @@ tab_calendario, tab_classifica, tab_value, tab_grafici, tab_ai_schedine, tab_val
 
 
 @st.cache_data(ttl=3600)
-def scarica_dati(chiave, league_code):
+def scarica_dati_club(chiave, league_code):
     if not chiave:
         return None
     url = f"https://api.football-data.org/v4/competitions/{league_code}/matches"
@@ -175,7 +179,7 @@ def scarica_dati(chiave, league_code):
 
 
 @st.cache_data(ttl=3600)
-def scarica_classifica(chiave, league_code):
+def scarica_classifica_club(chiave, league_code):
     if not chiave:
         return None
     url = f"https://api.football-data.org/v4/competitions/{league_code}/standings"
@@ -189,25 +193,76 @@ def scarica_classifica(chiave, league_code):
     return None
 
 
+@st.cache_data(ttl=3600)
+def scarica_dati_nazionali(chiave, league_id):
+    if not chiave:
+        return None
+    # Endpoint ufficiale API-Football (v3) per le partite della stagione corrente
+    url = f"https://v3.football.api-sports.io/fixtures?league={league_id}&season=2026"
+    headers = {
+        "x-rapidapi-key": chiave,
+        "x-rapidapi-host": "v3.football.api-sports.io"
+    }
+    try:
+        res = requests.get(url, headers=headers, timeout=10)
+        if res.status_code == 200:
+            return res.json()
+    except Exception:
+        pass
+    return None
+
+
+@st.cache_data(ttl=3600)
+def scarica_classifica_nazionali(chiave, league_id):
+    if not chiave:
+        return None
+    url = f"https://v3.football.api-sports.io/standings?league={league_id}&season=2026"
+    headers = {
+        "x-rapidapi-key": chiave,
+        "x-rapidapi-host": "v3.football.api-sports.io"
+    }
+    try:
+        res = requests.get(url, headers=headers, timeout=10)
+        if res.status_code == 200:
+            return res.json()
+    except Exception:
+        pass
+    return None
+
+
 def poisson_prob(lmbda, k):
     return (math.exp(-lmbda) * (lmbda**k)) / math.factorial(k)
 
 
-def calcola_forma_recente(matches_list, nome_squadra):
+def calcola_forma_recente(matches_list, nome_squadra, is_api_football=False):
     partite_squadra = []
     for m in matches_list:
-        if m["status"] == "FINISHED":
-            h = m["homeTeam"]["name"]
-            a = m["awayTeam"]["name"]
-            if h == nome_squadra or a == nome_squadra:
-                gh = m["score"]["fullTime"].get("home", 0)
-                ga = m["score"]["fullTime"].get("away", 0)
-                if gh is not None and ga is not None:
-                    if h == nome_squadra:
-                        res = "V" if gh > ga else ("P" if gh == ga else "S")
-                    else:
-                        res = "V" if ga > gh else ("P" if ga == gh else "S")
-                    partite_squadra.append(res)
+        if not is_api_football:
+            if m["status"] == "FINISHED":
+                h = m["homeTeam"]["name"]
+                a = m["awayTeam"]["name"]
+                if h == nome_squadra or a == nome_squadra:
+                    gh = m["score"]["fullTime"].get("home", 0)
+                    ga = m["score"]["fullTime"].get("away", 0)
+                    if gh is not None and ga is not None:
+                        if h == nome_squadra:
+                            res = "V" if gh > ga else ("P" if gh == ga else "S")
+                        else:
+                            res = "V" if ga > gh else ("P" if ga == gh else "S")
+                        partite_squadra.append(res)
+        else:
+            if m.get("fixture", {}).get("status", {}).get("short") == "FT":
+                h = m["teams"]["home"]["name"]
+                a = m["teams"]["away"]["name"]
+                if h == nome_squadra or a == nome_squadra:
+                    gh = m["goals"]["home"]
+                    ga = m["goals"]["away"]
+                    if gh is not None and ga is not None:
+                        if h == nome_squadra:
+                            res = "V" if gh > ga else ("P" if gh == ga else "S")
+                        else:
+                            res = "V" if ga > gh else ("P" if ga == gh else "S")
+                        partite_squadra.append(res)
     ultime = partite_squadra[-5:] if len(partite_squadra) >= 5 else partite_squadra
     return "".join(ultime) if ultime else "N/D"
 
@@ -215,20 +270,17 @@ def calcola_forma_recente(matches_list, nome_squadra):
 statistiche_squadre = {}
 matches_raw = []
 
-if api_key:
-    dati = scarica_dati(api_key, codice_lega)
-    dati_classifica = scarica_classifica(api_key, codice_lega)
+# Caricamento dati in base alla fonte selezionata
+if tipo_fonte == "football-data" and api_key:
+    dati = scarica_dati_club(api_key, codice_lega)
+    dati_classifica = scarica_classifica_club(api_key, codice_lega)
 
     if dati and "matches" in dati:
         matches_raw = dati["matches"]
 
     if dati_classifica and "standings" in dati_classifica:
         for s in dati_classifica["standings"]:
-            # Gestisce sia classifiche totali che a gironi (es. Nations League / Champions)
             table_data = s.get("table", [])
-            if not table_data and "group" in s and isinstance(s["group"], list):
-                # Gestione alternativa gironi multipli se presenti
-                pass
             for riga in table_data:
                 nome_sq = riga["team"]["name"]
                 giocate = max(riga["playedGames"], 1)
@@ -238,32 +290,74 @@ if api_key:
                     "media_gf": gf / giocate,
                     "media_gs": gs / giocate,
                     "punti": riga["points"],
-                    "forma": calcola_forma_recente(matches_raw, nome_sq),
+                    "forma": calcola_forma_recente(matches_raw, nome_sq, is_api_football=False),
                 }
+
+elif tipo_fonte == "api-football" and api_key_nazionali:
+    dati_naz = scarica_dati_nazionali(api_key_nazionali, codice_lega)
+    dati_classifica_naz = scarica_classifica_nazionali(api_key_nazionali, codice_lega)
+
+    if dati_naz and "response" in dati_naz:
+        matches_raw = dati_naz["response"]
+
+    if dati_classifica_naz and "response" in dati_classifica_naz:
+        for item in dati_classifica_naz["response"]:
+            for standing_group in item.get("league", {}).get("standings", []):
+                for riga in standing_group:
+                    nome_sq = riga["team"]["name"]
+                    all_p = riga.get("all", {})
+                    giocate = max(all_p.get("played", 1), 1)
+                    gf = all_p.get("goals", {}).get("for", 0)
+                    gs = all_p.get("goals", {}).get("against", 0)
+                    statistiche_squadre[nome_sq] = {
+                        "media_gf": gf / giocate,
+                        "media_gs": gs / giocate,
+                        "punti": riga.get("points", 0),
+                        "forma": calcola_forma_recente(matches_raw, nome_sq, is_api_football=True),
+                    }
 
 
 # --- TAB 1: CALENDARIO E STUDIO STATISTICO ---
 with tab_calendario:
-    if api_key:
+    chiave_attiva = api_key if tipo_fonte == "football-data" else api_key_nazionali
+    if chiave_attiva:
         if matches_raw:
             lista = []
             for m in matches_raw:
-                g_casa = m["score"]["fullTime"].get("home") if m.get("score") and m["score"].get("fullTime") else None
-                g_trasf = m["score"]["fullTime"].get("away") if m.get("score") and m["score"].get("fullTime") else None
-
-                lista.append({
-                    "giornata": m.get("matchday", 0),
-                    "casa": m["homeTeam"]["name"],
-                    "trasferta": m["awayTeam"]["name"],
-                    "data": m["utcDate"][:10],
-                    "ora": m["utcDate"][11:16],
-                    "gol_casa": g_casa if g_casa is not None else "-",
-                    "gol_trasf": g_trasf if g_trasf is not None else "-",
-                    "stato": m["status"],
-                })
+                if tipo_fonte == "football-data":
+                    g_casa = m["score"]["fullTime"].get("home") if m.get("score") and m["score"].get("fullTime") else None
+                    g_trasf = m["score"]["fullTime"].get("away") if m.get("score") and m["score"].get("fullTime") else None
+                    lista.append({
+                        "giornata": m.get("matchday", 0),
+                        "casa": m["homeTeam"]["name"],
+                        "trasferta": m["awayTeam"]["name"],
+                        "data": m["utcDate"][:10],
+                        "ora": m["utcDate"][11:16],
+                        "gol_casa": g_casa if g_casa is not None else "-",
+                        "gol_trasf": g_trasf if g_trasf is not None else "-",
+                        "stato": m["status"],
+                    })
+                else:
+                    fixture_info = m.get("fixture", {})
+                    teams_info = m.get("teams", {})
+                    goals_info = m.get("goals", {})
+                    
+                    g_casa = goals_info.get("home")
+                    g_trasf = goals_info.get("away")
+                    
+                    data_utc = fixture_info.get("date", "2026-01-01T00:00:00")
+                    lista.append({
+                        "giornata": 1, # API-Football raggruppa spesso per round testuale
+                        "casa": teams_info.get("home", {}).get("name", "Casa"),
+                        "trasferta": teams_info.get("away", {}).get("name", "Ospiti"),
+                        "data": data_utc[:10],
+                        "ora": data_utc[11:16],
+                        "gol_casa": g_casa if g_casa is not None else "-",
+                        "gol_trasf": g_trasf if g_trasf is not None else "-",
+                        "stato": fixture_info.get("status", {}).get("short", "NS"),
+                    })
 
             df = pd.DataFrame(lista)
-            df = df.dropna(subset=["giornata"])
             giornate = sorted(df["giornata"].unique())
 
             if len(giornate) > 0:
@@ -278,7 +372,7 @@ with tab_calendario:
 
                 partite_filtrate = df[df["giornata"] == giornata_sel]
 
-                st.markdown(f"### 📌 Match in Programma - Giornata {int(giornata_sel)}")
+                st.markdown(f"### 📌 Match in Programma")
 
                 for idx, row in partite_filtrate.iterrows():
                     with st.container():
@@ -300,9 +394,9 @@ with tab_calendario:
                                 st.session_state["match_attivo"] = row
                         st.markdown("</div>", unsafe_allow_html=True)
         else:
-            st.error("Impossibile scaricare i dati. Verifica la correttezza della chiave API.")
+            st.error("Nessun match trovato o chiave API non valida.")
     else:
-        st.info("👈 Inserisci la tua API Key gratuita nella barra laterale per sbloccare i calendari.")
+        st.info("👈 Inserisci la chiave API corrispondente nella barra laterale per sbloccare i calendari.")
 
     if "match_attivo" in st.session_state:
         m = st.session_state["match_attivo"]
@@ -429,54 +523,35 @@ with tab_calendario:
 # --- TAB 2: CLASSIFICA & EXPORT ---
 with tab_classifica:
     st.subheader(f"🏆 Classifica / Gironi - {campionato_scelto}")
-
-    if api_key:
-        dati_classifica = scarica_classifica(api_key, codice_lega)
-        if dati_classifica and "standings" in dati_classifica:
-            for s in dati_classifica["standings"]:
-                tabellone = s.get("table", [])
-                gruppo_nome = s.get("group", "Fase Unica")
-                if tabellone:
-                    if gruppo_nome and gruppo_nome != "Fase Unica":
-                        st.markdown(f"#### 📌 {gruppo_nome}")
-                    
-                    lista_classifica = []
-                    for riga in tabellone:
-                        lista_classifica.append({
-                            "Pos": riga["position"],
-                            "Squadra": riga["team"]["name"],
-                            "Punti": riga["points"],
-                            "Giocate": riga["playedGames"],
-                            "Vittorie": riga["won"],
-                            "Pareggi": riga["draw"],
-                            "Sconfitte": riga["lost"],
-                            "Gol Fatti": riga["goalsFor"],
-                            "Gol Subiti": riga["goalsAgainst"],
-                            "DR": riga["goalDifference"],
-                        })
-
-                    df_classifica = pd.DataFrame(lista_classifica)
-                    st.dataframe(df_classifica, use_container_width=True, hide_index=True)
-
-                    csv_data = df_classifica.to_csv(index=False).encode("utf-8")
-                    st.download_button(
-                        label=f"📥 Scarica Classifica ({gruppo_nome}) - CSV",
-                        data=csv_data,
-                        file_name=f"classifica_{codice_lega}_{gruppo_nome}.csv",
-                        mime="text/csv",
-                        key=f"dl_{gruppo_nome}"
-                    )
-                    st.markdown("---")
+    if chiave_attiva:
+        if statistiche_squadre:
+            lista_classifica = []
+            for sq, dati_sq in sorted(statistiche_squadre.items(), key=lambda x: x[1]["punti"], reverse=True):
+                lista_classifica.append({
+                    "Squadra": sq,
+                    "Punti": dati_sq["punti"],
+                    "Media GF": round(dati_sq["media_gf"], 2),
+                    "Media GS": round(dati_sq["media_gs"], 2),
+                    "Forma": dati_sq["forma"]
+                })
+            df_classifica = pd.DataFrame(lista_classifica)
+            st.dataframe(df_classifica, use_container_width=True, hide_index=True)
+            
+            csv_data = df_classifica.to_csv(index=False).encode("utf-8")
+            st.download_button(
+                label="📥 Scarica Classifica / Statistiche - CSV",
+                data=csv_data,
+                file_name=f"classifica_{codice_lega}.csv",
+                mime="text/csv",
+            )
         else:
-            st.error("Impossibile scaricare la classifica o i gironi.")
+            st.warning("Classifica non disponibile per questa competizione.")
     else:
-        st.info("👈 Inserisci la tua API Key nella barra laterale.")
+        st.info("👈 Inserisci la chiave API nella barra laterale.")
 
 # --- TAB 3: CALCOLATORE VALUE BET ---
 with tab_value:
     st.subheader("🔍 Analizzatore di Valore delle Quote (Value Bet)")
-    st.markdown("Confronta la percentuale di probabilità stimata con la quota del bookmaker per trovare valore atteso positivo.")
-
     col_v1, col_v2 = st.columns(2)
     with col_v1:
         probabilita_stimata = st.slider("Probabilità stimata (%)", 1.0, 100.0, 50.0, 0.5)
@@ -497,8 +572,7 @@ with tab_value:
             f"""
                 <div class="value-box">
                     <h4>🔥 OTTIMA VALUE BET TROVATA!</h4>
-                    <p>La quota (<b>{quota_bookmaker}</b>) è superiore alla quota equa stimata (<b>{quota_equa:.2f}</b>). 
-                    Esiste un vantaggio statistico a favore dello scommettitore.</p>
+                    <p>La quota (<b>{quota_bookmaker}</b>) è superiore alla quota equa stimata (<b>{quota_equa:.2f}</b>).</p>
                 </div>
             """,
             unsafe_allow_html=True,
@@ -508,7 +582,7 @@ with tab_value:
             """
                 <div class="no-value-box">
                     <h4>❌ NESSUN VALORE (SCONSIGLIATO)</h4>
-                    <p>La quota offerta non compensa il rischio stimato dalla probabilità reale.</p>
+                    <p>La quota offerta non compensa il rischio stimato.</p>
                 </div>
             """,
             unsafe_allow_html=True,
@@ -517,50 +591,32 @@ with tab_value:
 # --- TAB 4: GRAFICI & TREND ---
 with tab_grafici:
     st.subheader(f"📊 Trend & Panoramica - {campionato_scelto}")
-
-    if api_key and "df_classifica" in locals() and not df_classifica.empty:
-        col_g1, col_g2 = st.columns(2)
-
-        with col_g1:
-            st.markdown("##### 📈 Punti in Classifica")
-            fig_punti = px.bar(
-                df_classifica,
-                x="Squadra",
-                y="Punti",
-                color="Punti",
-                color_continuous_scale="Viridis",
-                template=plotly_template,
-            )
-            fig_punti.update_layout(xaxis_tickangle=-45, margin=dict(l=10, r=10, t=10, b=10), height=420)
-            st.plotly_chart(fig_punti, use_container_width=True)
-
-        with col_g2:
-            st.markdown("##### ⚽ Gol Fatti vs Gol Subiti")
-            fig_gol = px.scatter(
-                df_classifica,
-                x="Gol Fatti",
-                y="Gol Subiti",
-                text="Squadra",
-                size="Punti",
-                color="DR",
-                color_continuous_scale="Bluered",
-                template=plotly_template,
-            )
-            fig_gol.update_traces(textposition="top center", marker=dict(size=12))
-            fig_gol.update_layout(margin=dict(l=10, r=10, t=10, b=10), height=420)
-            st.plotly_chart(fig_gol, use_container_width=True)
+    if chiave_attiva and statistiche_squadre:
+        lista_grafico = [{"Squadra": k, "Punti": v["punti"], "Gol Fatti (Medio)": v["media_gf"]} for k, v in statistiche_squadre.items()]
+        df_g = pd.DataFrame(lista_grafico)
+        fig_punti = px.bar(df_g, x="Squadra", y="Punti", color="Punti", color_continuous_scale="Viridis", template=plotly_template)
+        fig_punti.update_layout(xaxis_tickangle=-45, margin=dict(l=10, r=10, t=10, b=10), height=420)
+        st.plotly_chart(fig_punti, use_container_width=True)
     else:
-        st.info("Carica prima la classifica nel Tab 2 inserendo la chiave API per visualizzare i grafici.")
+        st.info("Carica i dati tramite chiave API per visualizzare i grafici.")
 
 
 def genera_dataset_valore(matches_list, stats_dict):
     righe_valore = []
     if not matches_list or not stats_dict:
         return pd.DataFrame()
-
     for m in matches_list:
-        h = m["homeTeam"]["name"]
-        a = m["awayTeam"]["name"]
+        if "homeTeam" in m:
+            h = m["homeTeam"]["name"]
+            a = m["awayTeam"]["name"]
+            giornata = m.get("matchday", 1)
+            data_m = m["utcDate"][:10]
+        else:
+            h = m["teams"]["home"]["name"]
+            a = m["teams"]["away"]["name"]
+            giornata = 1
+            data_m = m.get("fixture", {}).get("date", "2026-01-01")[:10]
+
         if h in stats_dict and a in stats_dict:
             lam_c = stats_dict[h]["media_gf"]
             lam_t = stats_dict[a]["media_gf"]
@@ -574,53 +630,33 @@ def genera_dataset_valore(matches_list, stats_dict):
                     elif rc == rt: pp += pr
                     else: pt += pr
             tot = pc + pp + pt
-            if tot > 0:
-                pc, pp, pt = pc/tot, pp/tot, pt/tot
-            else:
-                pc, pp, pt = 0.33, 0.33, 0.34
+            pc, pp, pt = (pc/tot, pp/tot, pt/tot) if tot > 0 else (0.33, 0.33, 0.34)
 
             over_prob = sum(poisson_prob(lam_c, rc) * poisson_prob(lam_t, rt) for rc in range(5) for rt in range(5) if rc + rt > 2.5)
             
             if pc >= pt and pc >= 0.45:
-                mercato = "1X2"
-                selezione = f"1 ({h})"
-                prob_mod = pc
-                quota_book = round(1.05 / max(prob_mod, 0.1), 2)
+                mercato, selezione, prob_mod = "1X2", f"1 ({h})", pc
             elif pt > pc and pt >= 0.40:
-                mercato = "1X2"
-                selezione = f"2 ({a})"
-                prob_mod = pt
-                quota_book = round(1.05 / max(prob_mod, 0.1), 2)
+                mercato, selezione, prob_mod = "1X2", f"2 ({a})", pt
             elif over_prob > 0.55:
-                mercato = "Over/Under"
-                selezione = "Over 2.5"
-                prob_mod = over_prob
-                quota_book = round(1.05 / max(prob_mod, 0.1), 2)
+                mercato, selezione, prob_mod = "Over/Under", "Over 2.5", over_prob
             else:
-                mercato = "1X2"
-                selezione = "X (Pareggio)"
-                prob_mod = pp
-                quota_book = round(1.05 / max(prob_mod, 0.1), 2)
+                mercato, selezione, prob_mod = "1X2", "X (Pareggio)", pp
 
+            quota_book = round(1.05 / max(prob_mod, 0.1), 2)
             edge = round(((prob_mod * quota_book) - 1) * 100, 1)
-
-            if quota_book < 1.50 and prob_mod > 0.65:
-                rischio = "Basso"
-            elif 1.50 <= quota_book <= 2.20:
-                rischio = "Medio"
-            else:
-                rischio = "Alto"
+            rischio = "Basso" if quota_book < 1.50 and prob_mod > 0.65 else ("Medio" if 1.50 <= quota_book <= 2.20 else "Alto")
 
             righe_valore.append({
                 "Partita": f"{h} - {a}",
-                "Giornata": m.get("matchday", 1),
+                "Giornata": giornata,
                 "Mercato": mercato,
                 "Selezione": selezione,
                 "Prob_Modello": round(prob_mod * 100, 1),
                 "Quota_Book": quota_book,
                 "Edge": edge,
                 "Rischio": rischio,
-                "Data": m["utcDate"][:10]
+                "Data": data_m
             })
     return pd.DataFrame(righe_valore)
 
@@ -629,34 +665,15 @@ df_valore_generato = genera_dataset_valore(matches_raw, statistiche_squadre)
 # --- TAB 5: SCHEDINE SMART & AI ---
 with tab_ai_schedine:
     st.subheader("🤖 Generatore Automatico di Schedine & Accumulatori Smart")
-    st.markdown("Seleziona la **giornata** di riferimento: l'IA combinerà le migliori selezioni esclusivamente all'interno dello **stesso turno**.")
-
-    if not df_valore_generato.empty and "Giornata" in df_valore_generato.columns:
+    if not df_valore_generato.empty:
         giornate_disponibili = sorted(df_valore_generato["Giornata"].unique())
-
-        col_g1, col_g2, col_g3 = st.columns(3)
-        with col_g1:
-            giornata_scelta = st.selectbox("📅 Seleziona Turno / Giornata", giornate_disponibili)
-        with col_g2:
-            profilo_rischio = st.selectbox("🎯 Profilo di Rischio Schedina", ["Basso (Rendimento costante)", "Medio (Bilanciato)", "Alto (Moltiplicatore forte)"])
-        with col_g3:
-            num_eventi = st.slider("🔢 Numero di eventi in combo", 2, 5, 3)
-
+        giornata_scelta = st.selectbox("📅 Seleziona Turno / Giornata", giornate_disponibili)
+        
         df_giornata = df_valore_generato[df_valore_generato["Giornata"] == giornata_scelta]
-
-        if "Basso" in profilo_rischio:
-            df_pool = df_giornata[df_giornata["Rischio"] == "Basso"]
-            if len(df_pool) < num_eventi: df_pool = df_giornata
-        elif "Medio" in profilo_rischio:
-            df_pool = df_giornata[df_giornata["Rischio"].isin(["Basso", "Medio"])]
-            if len(df_pool) < num_eventi: df_pool = df_giornata
-        else:
-            df_pool = df_giornata.sort_values(by="Edge", ascending=False)
-
-        subset_smart = df_pool.head(num_eventi)
-
+        num_eventi = st.slider("🔢 Numero di eventi in combo", 2, 5, min(3, max(2, len(df_giornata))))
+        
+        subset_smart = df_giornata.head(num_eventi)
         if not subset_smart.empty:
-            st.markdown("---")
             quota_totale_combo = np.prod(subset_smart["Quota_Book"].values)
             prob_complessiva_stimata = np.prod(subset_smart["Prob_Modello"].values / 100.0) * 100
 
@@ -665,71 +682,38 @@ with tab_ai_schedine:
             m2.metric("Quota Totale Stimata", f"{quota_totale_combo:.2f}")
             m3.metric("Probabilità Combinata Modello", f"{prob_complessiva_stimata:.1f}%")
 
-            st.markdown(f"#### 📋 Dettaglio Selezioni Smart - Turno {giornata_scelta}:")
             for idx, row in subset_smart.iterrows():
                 st.markdown(
                     f"""<div style='background:{metric_bg}; padding:12px 18px; border-radius:10px; margin-bottom:8px; border:1px solid {card_border};'>
-                    <b>{row['Partita']}</b> &nbsp;|&nbsp; Data: <code>{row['Data']}</code> &nbsp;|&nbsp; Pronostico: <span style='color:#38bdf8;'><b>{row['Selezione']}</b></span> 
-                    &nbsp;|&nbsp; Quota: <b>{row['Quota_Book']}</b> &nbsp;|&nbsp; Prob. Modello: <code>{row['Prob_Modello']}%</code> &nbsp;|&nbsp; Edge: <span style='color:#10b981;'><b>+{row['Edge']}%</b></span>
+                    <b>{row['Partita']}</b> &nbsp;|&nbsp; Pronostico: <span style='color:#38bdf8;'><b>{row['Selezione']}</b></span> 
+                    &nbsp;|&nbsp; Quota: <b>{row['Quota_Book']}</b> &nbsp;|&nbsp; Edge: <span style='color:#10b981;'><b>+{row['Edge']}%</b></span>
                     </div>""",
                     unsafe_allow_html=True
                 )
-
-            if st.button("🚀 Conferma e Salva Schedina Smart"):
-                st.success("🎉 Accumulatore Smart generato e salvato correttamente nel tuo portafoglio virtuale!")
-        else:
-            st.warning(f"Nessuna partita disponibile per il Turno {giornata_scelta} con i filtri attuali.")
     else:
-        st.info("⚠️ Inserisci una chiave API valida nella barra laterale per consentire all'IA di analizzare le partite.")
+        st.info("⚠️ Carica i dati tramite API Key per generare le schedine smart.")
 
 # --- TAB 6: VALUE FINDER AUTOMATICO ---
 with tab_value_finder:
     st.subheader("⚡ Scanner Value Finder Automatico")
-    st.markdown("Scansione massiva di tutte le partite alla ricerca di quote di valore dove il modello statistico rileva uno scostamento favorevole (Edge > 0).")
-
     if not df_valore_generato.empty:
         filtro_edge_min = st.slider("Filtro Edge Statistico Minimo (%)", -5.0, 25.0, 2.0, 0.5)
-        
         df_vf_filtrato = df_valore_generato[df_valore_generato["Edge"] >= filtro_edge_min].sort_values(by="Edge", ascending=False)
-
-        st.markdown(f"Trovate **{len(df_vf_filtrato)}** opportunità di valore nel palinsesto:")
-
-        st.dataframe(
-            df_vf_filtrato[["Giornata", "Data", "Partita", "Mercato", "Selezione", "Quota_Book", "Prob_Modello", "Edge", "Rischio"]].style.format({
-                "Quota_Book": "{:.2f}",
-                "Prob_Modello": "{:.1f}%",
-                "Edge": "{:+.1f}%"
-            }),
-            use_container_width=True,
-            hide_index=True
-        )
-
-        st.markdown(
-            """
-            > **Nota di Metodologia:** L'**Edge** rappresenta il vantaggio percentuale atteso dello scommettitore rispetto alla quota offerta dal bookmaker.
-            """,
-            unsafe_allow_html=True
-        )
+        st.dataframe(df_vf_filtrato, use_container_width=True, hide_index=True)
     else:
-        st.info("⚠️ Carica i dati tramite l'API Key nella barra laterale per avviare lo scanner automatico.")
+        st.info("⚠️ Carica i dati tramite API Key per avviare lo scanner.")
 
 # --- TAB 7: SIMULATORE MONTE CARLO & PLAYER IMPACT ---
 with tab_monte_carlo:
     st.subheader("🎲 Simulatore Stocastico Monte Carlo, Player Impact & Match Flow (Angoli & Tiri)")
-    st.markdown("Esegui migliaia di simulazioni virtuali proiettando gol, tiri in porta e calci d'angolo.")
-
     if statistiche_squadre:
         nomi_squadre = sorted(list(statistiche_squadre.keys()))
-        
         col_mc1, col_mc2 = st.columns(2)
         with col_mc1:
             sq_c_sim = st.selectbox("🏠 Squadra di Casa", nomi_squadre, index=0, key="sim_casa")
         with col_mc2:
             sq_t_sim = st.selectbox("✈️ Squadra Ospite", nomi_squadre, index=min(1, len(nomi_squadre)-1), key="sim_trasf")
 
-        st.markdown("---")
-        st.markdown("##### ⚙️ Parametri Avanzati di Simulazione & Fattori di Impatto")
-        
         col_p1, col_p2, col_p3 = st.columns(3)
         with col_p1:
             num_iterazioni = st.selectbox("Numero di Simulazioni", [1000, 5000, 10000], index=1)
@@ -770,26 +754,22 @@ with tab_monte_carlo:
             prob_t = (vittorie_trasf / num_iterazioni) * 100
 
             st.markdown("---")
-            st.markdown(f"### 📊 Risultati Simulazione Gol ({num_iterazioni:,} iterazioni virtuali)")
-
             mc1, mc2, mc3 = st.columns(3)
             mc1.metric(f"Vittoria {sq_c_sim} (1)", f"{prob_c:.1f}%")
             mc2.metric("Pareggio (X)", f"{prob_p:.1f}%")
             mc3.metric(f"Vittoria {sq_t_sim} (2)", f"{prob_t:.1f}%")
 
-            st.markdown("##### 🌡️ Matrice di Calore dei Risultati Esatti più Frequenti")
             matrice_risultati = np.zeros((5, 5))
             for gc, gt in zip(gol_casa_sim, gol_trasf_sim):
                 if gc <= 4 and gt <= 4:
                     matrice_risultati[gc, gt] += 1
             matrice_risultati_perc = (matrice_risultati / num_iterazioni) * 100
 
-            etichette_gol = ["0", "1", "2", "3", "4+"]
             fig_heatmap = px.imshow(
                 matrice_risultati_perc[:5, :5],
                 labels=dict(x=f"Gol {sq_t_sim}", y=f"Gol {sq_c_sim}", color="Probabilità (%)"),
-                x=etichette_gol,
-                y=etichette_gol,
+                x=["0", "1", "2", "3", "4+"],
+                y=["0", "1", "2", "3", "4+"],
                 text_auto=".1f",
                 color_continuous_scale="Teal",
                 template=plotly_template
@@ -797,65 +777,21 @@ with tab_monte_carlo:
             fig_heatmap.update_layout(height=430, margin=dict(l=10, r=10, t=10, b=10))
             st.plotly_chart(fig_heatmap, use_container_width=True)
 
-            st.markdown("---")
-            st.markdown("### 🎯 Analisi Avanzata Flusso Match: Tiri in Porta & Calci d'Angolo")
-
-            media_tiri_c = np.mean(tiri_casa_sim)
-            media_tiri_t = np.mean(tiri_trasf_sim)
-            tot_tiri_match = media_tiri_c + media_tiri_t
-
-            media_corner_c = np.mean(corner_casa_sim)
-            media_corner_t = np.mean(corner_trasf_sim)
-            tot_corner_match = media_corner_c + media_corner_t
-
-            prob_over_95_c = (np.sum((corner_casa_sim + corner_trasf_sim) > 9.5) / num_iterazioni) * 100
-            prob_tiri_c_45 = (np.sum(tiri_casa_sim >= 4.5) / num_iterazioni) * 100
-
-            col_flow1, col_flow2 = st.columns(2)
-
-            with col_flow1:
-                st.markdown(
-                    f"""
-                    <div class="metric-box" style="text-align: left; padding: 20px;">
-                        <h4 style="color: #38bdf8; margin-top:0;">🚩 Calci d'Angolo (Corners)</h4>
-                        <p><b>{sq_c_sim}:</b> {media_corner_c:.1f} medi</p>
-                        <p><b>{sq_t_sim}:</b> {media_corner_t:.1f} medi</p>
-                        <hr style="border-color: {card_border};">
-                        <p><b>Totale Angoli Stimati Match:</b> <span style="color:#10b981; font-size:18px;">{tot_corner_match:.1f}</span></p>
-                        <p style="font-size: 13px; color: {text_muted};">Probabilità Over 9.5 Corner Totali: <b>{prob_over_95_c:.1f}%</b></p>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-
-            with col_flow2:
-                st.markdown(
-                    f"""
-                    <div class="metric-box" style="text-align: left; padding: 20px;">
-                        <h4 style="color: #38bdf8; margin-top:0;">🎯 Tiri in Porta (Shots on Target)</h4>
-                        <p><b>{sq_c_sim}:</b> {media_tiri_c:.1f} tiri</p>
-                        <p><b>{sq_t_sim}:</b> {media_tiri_t:.1f} tiri</p>
-                        <hr style="border-color: {card_border};">
-                        <p><b>Totale Tiri in Porta Match:</b> <span style="color:#10b981; font-size:18px;">{tot_tiri_match:.1f}</span></p>
-                        <p style="font-size: 13px; color: {text_muted};">Prob. {sq_c_sim} Over 4.5 Tiri in Porta: <b>{prob_tiri_c_45:.1f}%</b></p>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+            tot_tiri_match = np.mean(tiri_casa_sim) + np.mean(tiri_trasf_sim)
+            tot_corner_match = np.mean(corner_casa_sim) + np.mean(corner_trasf_sim)
 
             st.markdown(
                 f"""
                 <div class="analysis-container">
-                    <h4>💡 Insight di Sintesi dell'IA (Monte Carlo Globale)</h4>
+                    <h4>💡 Insight di Sintesi dell'IA (Monte Carlo & Match Flow)</h4>
                     <ul>
-                        <li><b>Aspettativa Gol Corretta ({sq_c_sim}):</b> {lam_effettiva_c:.2f} (Base: {lam_base_c:.2f})</li>
-                        <li><b>Aspettativa Gol Corretta ({sq_t_sim}):</b> {lam_effettiva_t:.2f} (Base: {lam_base_t:.2f})</li>
-                        <li><b>Volume Offensivo Stimato:</b> Circa <b>{tot_tiri_match:.1f} tiri nello specchio</b> e <b>{tot_corner_match:.1f} calci d'angolo</b> complessivi nel match.</li>
-                        <li><b>Indice di Volatilità del Match:</b> {'Basso (Incontro stabile)' if abs(prob_c - prob_t) > 25 else 'Alto (Match imprevedibile e aperto)'}</li>
+                        <li><b>Aspettativa Gol Corretta ({sq_c_sim}):</b> {lam_effettiva_c:.2f}</li>
+                        <li><b>Aspettativa Gol Corretta ({sq_t_sim}):</b> {lam_effettiva_t:.2f}</li>
+                        <li><b>Volume Offensivo Stimato:</b> Circa <b>{tot_tiri_match:.1f} tiri nello specchio</b> e <b>{tot_corner_match:.1f} calci d'angolo</b> complessivi.</li>
                     </ul>
                 </div>
                 """,
                 unsafe_allow_html=True
             )
     else:
-        st.info("⚠️ Carica i dati inserendo l'API Key nella barra laterale per abilitare le simulazioni Monte Carlo tra le nazionali.")
+        st.info("⚠️ Carica i dati delle squadre per avviare le simulazioni Monte Carlo.")

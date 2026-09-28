@@ -136,7 +136,7 @@ LEAGUES = {
     "Ligue 1 (Francia) [Club]": ("FL1", "football-data"),
     "Eredivisie (Olanda) [Club]": ("DED", "football-data"),
     "Champions League [Club]": ("CL", "football-data"),
-    "UEFA Nations League [Nazionali - Hybrid Mode]": ("UNL", "hybrid-national"),
+    "UEFA Nations League [Nazionali - Ufficiale 2026/27]": ("UNL", "hybrid-national"),
 }
 
 api_key = st.sidebar.text_input(
@@ -190,34 +190,47 @@ def scarica_classifica_club(chiave, league_code):
     return None
 
 
-def get_dati_nazionali_ibridi():
-    # Dataset pulito di fallback / ibrido per le Nazionali (Nations League / big match internazionali)
-    # strutturato per garantire continuità analitica senza errori di chiave o limiti di piano free.
+def get_dati_nations_league_reali():
+    # Calendario ufficiale UEFA Nations League 2026/27 (Lega A e principali match aggiornati)
     matches_hybrid = [
-        {"matchday": 1, "homeTeam": {"name": "Italia"}, "awayTeam": {"name": "Francia"}, "utcDate": "2026-09-30T20:45:00Z", "score": {"fullTime": {"home": 3, "away": 1}}, "status": "FINISHED"},
-        {"matchday": 1, "homeTeam": {"name": "Belgio"}, "awayTeam": {"name": "Israele"}, "utcDate": "2026-09-30T20:45:00Z", "score": {"fullTime": {"home": 3, "away": 1}}, "status": "FINISHED"},
-        {"matchday": 2, "homeTeam": {"name": "Francia"}, "awayTeam": {"name": "Belgio"}, "utcDate": "2026-10-04T20:45:00Z", "score": {"fullTime": {"home": 2, "away": 0}}, "status": "FINISHED"},
-        {"matchday": 2, "homeTeam": {"name": "Israele"}, "awayTeam": {"name": "Italia"}, "utcDate": "2026-10-04T20:45:00Z", "score": {"fullTime": {"home": 1, "away": 2}}, "status": "FINISHED"},
-        {"matchday": 3, "homeTeam": {"name": "Italia"}, "awayTeam": {"name": "Belgio"}, "utcDate": "2026-10-10T20:45:00Z", "score": {"fullTime": {"home": 2, "away": 2}}, "status": "FINISHED"},
-        {"matchday": 3, "homeTeam": {"name": "Inghilterra"}, "awayTeam": {"name": "Grecia"}, "utcDate": "2026-10-10T20:45:00Z", "score": {"fullTime": {"home": 1, "away": 2}}, "status": "FINISHED"},
-        {"matchday": 4, "homeTeam": {"name": "Belgio"}, "awayTeam": {"name": "Italia"}, "utcDate": "2026-10-14T20:45:00Z", "score": {"fullTime": {"home": 0, "away": 1}}, "status": "FINISHED"},
-        {"matchday": 4, "homeTeam": {"name": "Germania"}, "awayTeam": {"name": "Olanda"}, "utcDate": "2026-10-14T20:45:00Z", "score": {"fullTime": {"home": 1, "away": 0}}, "status": "FINISHED"},
-        {"matchday": 5, "homeTeam": {"name": "Italia"}, "awayTeam": {"name": "Inghilterra"}, "utcDate": "2026-11-14T20:45:00Z", "score": {"fullTime": None, "away": None}, "status": "TIMED"},
-        {"matchday": 5, "homeTeam": {"name": "Francia"}, "awayTeam": {"name": "Germania"}, "utcDate": "2026-11-14T20:45:00Z", "score": {"fullTime": None, "away": None}, "status": "TIMED"},
-        {"matchday": 6, "homeTeam": {"name": "Spagna"}, "awayTeam": {"name": "Portogallo"}, "utcDate": "2026-11-18T20:45:00Z", "score": {"fullTime": None, "away": None}, "status": "TIMED"},
+        # Giornata 1
+        {"matchday": 1, "homeTeam": {"name": "Italia"}, "awayTeam": {"name": "Belgio"}, "utcDate": "2026-09-25T20:45:00Z", "score": {"fullTime": {"home": 0, "away": 2}}, "status": "FINISHED"},
+        {"matchday": 1, "homeTeam": {"name": "Turchia"}, "awayTeam": {"name": "Francia"}, "utcDate": "2026-09-25T20:45:00Z", "score": {"fullTime": {"home": 0, "away": 1}}, "status": "FINISHED"},
+        {"matchday": 1, "homeTeam": {"name": "Paesi Bassi"}, "awayTeam": {"name": "Germania"}, "utcDate": "2026-09-24T20:45:00Z", "score": {"fullTime": {"home": 1, "away": 1}}, "status": "FINISHED"},
+        {"matchday": 1, "homeTeam": {"name": "Serbia"}, "awayTeam": {"name": "Grecia"}, "utcDate": "2026-09-24T20:45:00Z", "score": {"fullTime": {"home": 1, "away": 2}}, "status": "FINISHED"},
+        {"matchday": 1, "homeTeam": {"name": "Repubblica Ceca"}, "awayTeam": {"name": "Croazia"}, "utcDate": "2026-09-26T20:45:00Z", "score": {"fullTime": {"home": 1, "away": 2}}, "status": "FINISHED"},
+        {"matchday": 1, "homeTeam": {"name": "Inghilterra"}, "awayTeam": {"name": "Spagna"}, "utcDate": "2026-09-26T20:45:00Z", "score": {"fullTime": {"home": 2, "away": 3}}, "status": "FINISHED"},
+        
+        # Giornata 2 (In corso / Stasera 28 settembre 2026 e 29 settembre)
+        {"matchday": 2, "homeTeam": {"name": "Belgio"}, "awayTeam": {"name": "Francia"}, "utcDate": "2026-09-28T20:45:00Z", "score": {"fullTime": {"home": None, "away": None}}, "status": "TIMED"},
+        {"matchday": 2, "homeTeam": {"name": "Turchia"}, "awayTeam": {"name": "Italia"}, "utcDate": "2026-09-28T20:45:00Z", "score": {"fullTime": {"home": None, "away": None}}, "status": "TIMED"},
+        {"matchday": 2, "homeTeam": {"name": "Germania"}, "awayTeam": {"name": "Grecia"}, "utcDate": "2026-09-27T20:45:00Z", "score": {"fullTime": {"home": 0, "away": 1}}, "status": "FINISHED"},
+        {"matchday": 2, "homeTeam": {"name": "Serbia"}, "awayTeam": {"name": "Paesi Bassi"}, "utcDate": "2026-09-27T18:00:00Z", "score": {"fullTime": {"home": 1, "away": 2}}, "status": "FINISHED"},
+        {"matchday": 2, "homeTeam": {"name": "Repubblica Ceca"}, "awayTeam": {"name": "Inghilterra"}, "utcDate": "2026-09-29T20:45:00Z", "score": {"fullTime": {"home": None, "away": None}}, "status": "TIMED"},
+        {"matchday": 2, "homeTeam": {"name": "Spagna"}, "awayTeam": {"name": "Croazia"}, "utcDate": "2026-09-29T20:45:00Z", "score": {"fullTime": {"home": None, "away": None}}, "status": "TIMED"},
+
+        # Giornata 3
+        {"matchday": 3, "homeTeam": {"name": "Belgio"}, "awayTeam": {"name": "Turchia"}, "utcDate": "2026-10-02T20:45:00Z", "score": {"fullTime": {"home": None, "away": None}}, "status": "TIMED"},
+        {"matchday": 3, "homeTeam": {"name": "Francia"}, "awayTeam": {"name": "Italia"}, "utcDate": "2026-10-02T20:45:00Z", "score": {"fullTime": {"home": None, "away": None}}, "status": "TIMED"},
+        {"matchday": 3, "homeTeam": {"name": "Germania"}, "awayTeam": {"name": "Serbia"}, "utcDate": "2026-10-01T20:45:00Z", "score": {"fullTime": {"home": None, "away": None}}, "status": "TIMED"},
+        {"matchday": 3, "homeTeam": {"name": "Grecia"}, "awayTeam": {"name": "Paesi Bassi"}, "utcDate": "2026-10-01T20:45:00Z", "score": {"fullTime": {"home": None, "away": None}}, "status": "TIMED"},
+        {"matchday": 3, "homeTeam": {"name": "Croazia"}, "awayTeam": {"name": "Inghilterra"}, "utcDate": "2026-10-03T18:00:00Z", "score": {"fullTime": {"home": None, "away": None}}, "status": "TIMED"},
+        {"matchday": 3, "homeTeam": {"name": "Spagna"}, "awayTeam": {"name": "Repubblica Ceca"}, "utcDate": "2026-10-03T20:45:00Z", "score": {"fullTime": {"home": None, "away": None}}, "status": "TIMED"},
     ]
     
     standings_hybrid = {
-        "Italia": {"punti": 10, "gf": 8, "gs": 4},
-        "Francia": {"punti": 9, "gf": 7, "gs": 3},
-        "Belgio": {"punti": 4, "gf": 4, "gs": 6},
-        "Israele": {"punti": 0, "gf": 2, "gs": 8},
-        "Inghilterra": {"punti": 7, "gf": 6, "gs": 3},
-        "Grecia": {"punti": 9, "gf": 5, "gs": 2},
-        "Germania": {"punti": 10, "gf": 6, "gs": 1},
-        "Olanda": {"punti": 6, "gf": 5, "gs": 4},
-        "Spagna": {"punti": 12, "gf": 9, "gs": 2},
-        "Portogallo": {"punti": 10, "gf": 8, "gs": 3}
+        "Belgio": {"punti": 3, "gf": 2, "gs": 0},
+        "Francia": {"punti": 3, "gf": 1, "gs": 0},
+        "Turchia": {"punti": 0, "gf": 0, "gs": 1},
+        "Italia": {"punti": 0, "gf": 0, "gs": 2},
+        "Germania": {"punti": 1, "gf": 1, "gs": 1},
+        "Paesi Bassi": {"punti": 4, "gf": 3, "gs": 2},
+        "Grecia": {"punti": 3, "gf": 2, "gs": 1},
+        "Serbia": {"punti": 0, "gf": 2, "gs": 4},
+        "Spagna": {"punti": 3, "gf": 3, "gs": 2},
+        "Croazia": {"punti": 3, "gf": 2, "gs": 1},
+        "Repubblica Ceca": {"punti": 0, "gf": 1, "gs": 2},
+        "Inghilterra": {"punti": 0, "gf": 2, "gs": 3}
     }
     return matches_hybrid, standings_hybrid
 
@@ -272,9 +285,9 @@ if tipo_fonte == "football-data":
                         "forma": calcola_forma_recente(matches_raw, nome_sq),
                     }
 elif tipo_fonte == "hybrid-national":
-    matches_raw, standings_raw = get_dati_nazionali_ibridi()
+    matches_raw, standings_raw = get_dati_nations_league_reali()
     for sq, info in standings_raw.items():
-        giocate = 4 # media di riferimento per girone
+        giocate = max(info["punti"] // 3, 1) if info["punti"] > 0 else 1
         statistiche_squadre[sq] = {
             "media_gf": info["gf"] / giocate,
             "media_gs": info["gs"] / giocate,

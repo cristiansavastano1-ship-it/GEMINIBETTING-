@@ -124,7 +124,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 st.markdown(
-    f"<p style='text-align: center; color: {text_muted}; font-size: 16px; margin-bottom: 30px;'>Piattaforma professionale di analisi statistica calcistica basata su Poisson, xG, Value Betting, AI Smart Acca & Simulazioni Monte Carlo.</p>",
+    f"<p style='text-align: center; color: {text_muted}; font-size: 16px; margin-bottom: 30px;'>Piattaforma professionale di analisi statistica calcistica basata su Poisson, xG, Value Betting, AI Smart Acca & H2H Storico.</p>",
     unsafe_allow_html=True,
 )
 
@@ -191,9 +191,7 @@ def scarica_classifica_club(chiave, league_code):
 
 
 def get_dati_nations_league_reali():
-    # Calendario ufficiale UEFA Nations League 2026/27 (Lega A e principali match aggiornati)
     matches_hybrid = [
-        # Giornata 1
         {"matchday": 1, "homeTeam": {"name": "Italia"}, "awayTeam": {"name": "Belgio"}, "utcDate": "2026-09-25T20:45:00Z", "score": {"fullTime": {"home": 0, "away": 2}}, "status": "FINISHED"},
         {"matchday": 1, "homeTeam": {"name": "Turchia"}, "awayTeam": {"name": "Francia"}, "utcDate": "2026-09-25T20:45:00Z", "score": {"fullTime": {"home": 0, "away": 1}}, "status": "FINISHED"},
         {"matchday": 1, "homeTeam": {"name": "Paesi Bassi"}, "awayTeam": {"name": "Germania"}, "utcDate": "2026-09-24T20:45:00Z", "score": {"fullTime": {"home": 1, "away": 1}}, "status": "FINISHED"},
@@ -201,7 +199,6 @@ def get_dati_nations_league_reali():
         {"matchday": 1, "homeTeam": {"name": "Repubblica Ceca"}, "awayTeam": {"name": "Croazia"}, "utcDate": "2026-09-26T20:45:00Z", "score": {"fullTime": {"home": 1, "away": 2}}, "status": "FINISHED"},
         {"matchday": 1, "homeTeam": {"name": "Inghilterra"}, "awayTeam": {"name": "Spagna"}, "utcDate": "2026-09-26T20:45:00Z", "score": {"fullTime": {"home": 2, "away": 3}}, "status": "FINISHED"},
         
-        # Giornata 2 (In corso / Stasera 28 settembre 2026 e 29 settembre)
         {"matchday": 2, "homeTeam": {"name": "Belgio"}, "awayTeam": {"name": "Francia"}, "utcDate": "2026-09-28T20:45:00Z", "score": {"fullTime": {"home": None, "away": None}}, "status": "TIMED"},
         {"matchday": 2, "homeTeam": {"name": "Turchia"}, "awayTeam": {"name": "Italia"}, "utcDate": "2026-09-28T20:45:00Z", "score": {"fullTime": {"home": None, "away": None}}, "status": "TIMED"},
         {"matchday": 2, "homeTeam": {"name": "Germania"}, "awayTeam": {"name": "Grecia"}, "utcDate": "2026-09-27T20:45:00Z", "score": {"fullTime": {"home": 0, "away": 1}}, "status": "FINISHED"},
@@ -209,7 +206,6 @@ def get_dati_nations_league_reali():
         {"matchday": 2, "homeTeam": {"name": "Repubblica Ceca"}, "awayTeam": {"name": "Inghilterra"}, "utcDate": "2026-09-29T20:45:00Z", "score": {"fullTime": {"home": None, "away": None}}, "status": "TIMED"},
         {"matchday": 2, "homeTeam": {"name": "Spagna"}, "awayTeam": {"name": "Croazia"}, "utcDate": "2026-09-29T20:45:00Z", "score": {"fullTime": {"home": None, "away": None}}, "status": "TIMED"},
 
-        # Giornata 3
         {"matchday": 3, "homeTeam": {"name": "Belgio"}, "awayTeam": {"name": "Turchia"}, "utcDate": "2026-10-02T20:45:00Z", "score": {"fullTime": {"home": None, "away": None}}, "status": "TIMED"},
         {"matchday": 3, "homeTeam": {"name": "Francia"}, "awayTeam": {"name": "Italia"}, "utcDate": "2026-10-02T20:45:00Z", "score": {"fullTime": {"home": None, "away": None}}, "status": "TIMED"},
         {"matchday": 3, "homeTeam": {"name": "Germania"}, "awayTeam": {"name": "Serbia"}, "utcDate": "2026-10-01T20:45:00Z", "score": {"fullTime": {"home": None, "away": None}}, "status": "TIMED"},
@@ -256,6 +252,26 @@ def calcola_forma_recente(matches_list, nome_squadra):
                     partite_squadra.append(res)
     ultime = partite_squadra[-5:] if len(partite_squadra) >= 5 else partite_squadra
     return "".join(ultime) if ultime else "N/D"
+
+
+def analizza_h2h(matches_list, sq_casa, sq_trasf):
+    precedenti = []
+    for m in matches_list:
+        if m["status"] == "FINISHED":
+            h = m["homeTeam"]["name"]
+            a = m["awayTeam"]["name"]
+            if (h == sq_casa and a == sq_trasf) or (h == sq_trasf and a == sq_casa):
+                gh = m["score"]["fullTime"].get("home", 0)
+                ga = m["score"]["fullTime"].get("away", 0)
+                if gh is not None and ga is not None:
+                    precedenti.append({
+                        "data": m["utcDate"][:10],
+                        "casa": h,
+                        "trasferta": a,
+                        "gol_casa": gh,
+                        "gol_trasf": ga
+                    })
+    return precedenti
 
 
 statistiche_squadre = {}
@@ -349,7 +365,7 @@ with tab_calendario:
                             )
                         with c3:
                             st.markdown("<br>", unsafe_allow_html=True)
-                            if st.button("📊 Studio Poisson", key=f"btn_match_{idx}"):
+                            if st.button("📊 Studio Poisson & H2H", key=f"btn_match_{idx}"):
                                 st.session_state["match_attivo"] = row
                         st.markdown("</div>", unsafe_allow_html=True)
         else:
@@ -419,7 +435,7 @@ with tab_calendario:
         )
 
         st.markdown('<div class="analysis-container">', unsafe_allow_html=True)
-        st.markdown(f"<h2>🔬 Analisi Scientifica: {sq_casa} vs {sq_trasf}</h2>", unsafe_allow_html=True)
+        st.markdown(f"<h2>🔬 Analisi Scientifica & H2H: {sq_casa} vs {sq_trasf}</h2>", unsafe_allow_html=True)
         st.markdown(
             f"<p style='color: {text_muted};'>Forma Recente (Ultime 5): 🏠 <b>{sq_casa}</b> [{forma_casa}] &nbsp;|&nbsp; ✈️ <b>{sq_trasf}</b> [{forma_trasf}]</p>",
             unsafe_allow_html=True,
@@ -432,6 +448,7 @@ with tab_calendario:
                 "1X2 & Doppia Chance",
                 "Gol / No Gol & Over/Under",
                 "Risultati Esatti",
+                "Confronto H2H Storico",
             ],
             horizontal=True,
         )
@@ -476,6 +493,25 @@ with tab_calendario:
                 res_str, prob_val = risultati_esatti_list[i]
                 with [col1, col2, col3, col4][i]:
                     st.markdown(f'<div class="metric-box"><b>Top {i+1}</b><br><span style="font-size:22px; color:#10b981;">{res_str}</span><br><span style="font-size:12px; color:{text_muted};">{prob_val:.1f}%</span></div>', unsafe_allow_html=True)
+
+        elif focus_mercato == "Confronto H2H Storico":
+            storico_h2h = analizza_h2h(matches_raw, sq_casa, sq_trasf)
+            if storico_h2h:
+                st.markdown(f"#### 📜 Scontri Diretti Registrati ({len(storico_h2h)} precedenti)")
+                df_h2h = pd.DataFrame(storico_h2h)
+                df_h2h.columns = ["Data", "Casa", "Ospiti", "Gol Casa", "Gol Ospiti"]
+                st.dataframe(df_h2h, use_container_width=True, hide_index=True)
+                
+                vittorie_c = sum(1 for x in storico_h2h if (x["casa"] == sq_casa and x["gol_casa"] > x["gol_trasf"]) or (x["trasferta"] == sq_casa and x["gol_trasf"] > x["gol_casa"]))
+                vittorie_t = sum(1 for x in storico_h2h if (x["casa"] == sq_trasf and x["gol_casa"] > x["gol_trasf"]) or (x["trasferta"] == sq_trasf and x["gol_trasf"] > x["gol_casa"]))
+                pareggi_h = len(storico_h2h) - vittorie_c - vittorie_t
+
+                c1, c2, c3 = st.columns(3)
+                c1.metric(f"Vittorie {sq_casa}", vittorie_c)
+                c2.metric("Pareggi", pareggi_h)
+                c3.metric(f"Vittorie {sq_trasf}", vittorie_t)
+            else:
+                st.info(f"Nessun precedente diretto recente registrato nel database attivo per {sq_casa} vs {sq_trasf}.")
 
         st.markdown("</div>", unsafe_allow_html=True)
 
